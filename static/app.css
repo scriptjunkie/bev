@@ -710,6 +710,7 @@ h1 em {
 .merch-copy { min-width: 0; }
 
 .shirt-buy {
+  display: inline-block;
   border: 0;
   background: var(--red);
   color: #fff8f4;
@@ -719,20 +720,7 @@ h1 em {
   text-transform: uppercase;
   font-size: 13px;
   padding: 14px 18px;
-  cursor: pointer;
+  text-decoration: none;
 }
 
 .shirt-buy:hover { background: #c43324; }
-
-.shirt-buy:disabled {
-  cursor: wait;
-  opacity: 0.7;
-}
-
-.shirt-status {
-  margin: 10px 0 0;
-  color: #6d2418;
-  font-size: 14px;
-}
-
-.shirt-status[hidden] { display: none; }

@@ -45,6 +45,15 @@ impl Site {
     }
 
 
+
+    /// Same-origin (or CVE-subdomain) path that creates or reuses a Teemill product.
+    pub fn shirt(&self, id: &CveId) -> String {
+        match &self.base_domain {
+            Some(_) => format!("{}shirt", self.cve(id)),
+            None => format!("/cve/{id}/shirt"),
+        }
+    }
+
     pub fn cve_str(&self, id: &str) -> String {
         match cve::parse(id) {
             Ok(id) => self.cve(&id),

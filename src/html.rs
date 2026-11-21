@@ -267,9 +267,9 @@ fn merch(branding: &Branding, cache_dir: &Path, site: &Site, teemill_key: Option
     if branding.prefilled {
         return String::new();
     }
-    let Some(key) = teemill_key.filter(|k| !k.is_empty()) else {
+    if teemill_key.filter(|k| !k.is_empty()).is_none() {
         return String::new();
-    };
+    }
     let Ok(id) = crate::cve::parse(&branding.cve_id) else {
         return String::new();
     };
@@ -279,20 +279,8 @@ fn merch(branding: &Branding, cache_dir: &Path, site: &Site, teemill_key: Option
     if cache::logo_path(cache_dir, &id, file).is_none() {
         return String::new();
     }
-    let product_attr = branding
-        .teemill_url
-        .as_deref()
-        .filter(|url| crate::print::is_teemill_product_url(url))
-        .map(|url| format!(r#" data-product-url="{}""#, esc(url)))
-        .unwrap_or_default();
-    let description = if !branding.tagline.is_empty() {
-        branding.tagline.as_str()
-    } else {
-        branding.blurb.as_str()
-    };
-    let product_name = format!("{} ({})", branding.name, branding.cve_id);
     format!(
-        r#"<section class="merch" data-teemill-key="{key}" data-print-url="{print_url}" data-name="{name}" data-description="{desc}" data-cve="{cve}" data-save-url="/cve/{cve}/teemill"{product_attr}>
+        r#"<section class="merch">
   <div class="shirt" aria-hidden="true">
     <svg class="shirt-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -307,17 +295,26 @@ fn merch(branding: &Branding, cache_dir: &Path, site: &Site, teemill_key: Option
     </svg>
   </div>
   <div class="merch-copy">
-    <button type="button" class="shirt-buy">Purchase this on a T-shirt</button>
-    <p class="shirt-status" hidden></p>
+    <a class="shirt-buy" href="{href}">Purchase this on a T-shirt</a>
   </div>
 </section>"#,
-        key = esc(key),
-        print_url = esc(&site.print_png(&id)),
-        name = esc(&product_name),
-        desc = esc(description),
         cve = esc(&branding.cve_id),
-        product_attr = product_attr,
+        href = esc(&site.shirt(&id)),
     )
+}
+
+pub fn shirt_error(title: &str, message: &str, dossier_url: &str, site: &Site) -> String {
+    let mut body = String::new();
+    body.push_str(r#"<article class="dossier">"#);
+    body.push_str(&format!(
+        r#"<p class="kicker">T-shirt</p><h1>{}</h1><p class="blurb">{}</p><p><a href="{}">Back to the dossier</a></p>"#,
+        esc(title),
+        esc(message),
+        esc(dossier_url),
+    ));
+    body.push_str(&search_form(site));
+    body.push_str("</article>");
+    layout(&format!("{title} · Brand Every Vuln"), &body, site, None)
 }
 
 fn plate(branding: &Branding, cache_dir: &Path, large: bool) -> String {
@@ -525,13 +522,14 @@ mod tests {
         };
         let page = cve_page(&branding, &dir, &site, Some("test-teemill-key"));
         assert!(page.contains("Purchase this on a T-shirt"));
-        assert!(page.contains("data-teemill-key=\"test-teemill-key\""));
-        assert!(page.contains("https://cve-2026-1337.brandeveryvuln.com/print.png"));
-        assert!(page.contains("CharSlice (CVE-2026-1337)"));
+        assert!(page.contains("https://cve-2026-1337.brandeveryvuln.com/shirt"));
+        assert!(page.contains(r#"<a class="shirt-buy""#));
+        assert!(!page.contains("data-teemill-key"));
+        assert!(!page.contains("teemill.com/omnis"));
         branding.prefilled = true;
         let famous = cve_page(&branding, &dir, &site, Some("test-teemill-key"));
         assert!(!famous.contains("Purchase this on a T-shirt"));
-        assert!(!famous.contains("data-teemill-key"));
+        assert!(!famous.contains("/shirt"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

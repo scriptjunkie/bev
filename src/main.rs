@@ -13,7 +13,7 @@ mod paths;
 mod print;
 
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
-use crate::brand::{App, BrandError};
+use crate::brand::{App, BrandError, ShirtError};
 use crate::cve::CveId;
 use crate::host::{HostClass, Site};
 use crate::html::ExploreCard;
@@ -36,7 +36,7 @@ const FONTS: &[&str] = &[
     "ibm-plex-mono-normal-500.woff2",
 ];
 
-const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' https://teemill.com; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 fn main() {
     load_dotenv();
@@ -99,9 +99,6 @@ fn route(app: &App, request: Request) {
     let (path, query) = split_url(&url);
     let path = percent_decode(&path, false);
 
-    if method == Method::Post {
-        return save_teemill(app, request, &class, &site, &path);
-    }
     if method != Method::Get && method != Method::Head {
         let page = html::trouble(
             "405",
@@ -136,6 +133,7 @@ fn route(app: &App, request: Request) {
         HostClass::Cve(id) if path == "/" => return serve_cve(app, request, &site, &id),
         HostClass::Cve(id) if path == "/print.png" => return respond(request, print_response(app, &site, &id)),
         HostClass::Cve(id) if path == "/logo" => return respond(request, logo_response(app, &site, &id)),
+        HostClass::Cve(id) if path == "/shirt" => return respond(request, shirt_response(app, &site, &id)),
         HostClass::Apex | HostClass::Cve(_) => {}
     }
 
@@ -202,6 +200,8 @@ fn cve_route(app: &App, request: Request, site: &Site, rest: &str) {
         (id.trim_end_matches('/'), "logo")
     } else if let Some(id) = rest.strip_suffix("/print.png") {
         (id.trim_end_matches('/'), "print")
+    } else if let Some(id) = rest.strip_suffix("/shirt") {
+        (id.trim_end_matches('/'), "shirt")
     } else {
         (rest.trim_end_matches('/'), "page")
     };
@@ -215,6 +215,7 @@ fn cve_route(app: &App, request: Request, site: &Site, rest: &str) {
     match extra {
         "logo" => respond(request, logo_response(app, site, &id)),
         "print" => respond(request, print_response(app, site, &id)),
+        "shirt" => respond(request, shirt_response(app, site, &id)),
         _ => serve_cve(app, request, site, &id),
     }
 }
@@ -321,65 +322,42 @@ fn print_response(app: &App, site: &Site, id: &CveId) -> Response<Cursor<Vec<u8>
     }
 }
 
-fn save_teemill(app: &App, mut request: Request, class: &HostClass, site: &Site, path: &str) {
-    let id = match class {
-        HostClass::Cve(id) if path == "/teemill" => id.clone(),
-        _ => {
-            let Some(rest) = path.strip_prefix("/cve/") else {
-                let page = html::trouble("405", "That method doesn't open a file.", "The desk only answers GET, except to remember a T-shirt link.", None, site);
-                return respond(request, html_response(405, page));
-            };
-            let Some(raw) = rest.strip_suffix("/teemill") else {
-                let page = html::trouble("405", "That method doesn't open a file.", "The desk only answers GET, except to remember a T-shirt link.", None, site);
-                return respond(request, html_response(405, page));
-            };
-            match cve::parse(raw.trim_end_matches('/')) {
-                Ok(id) => id,
-                Err(message) => return respond(request, html_response(400, invalid_page(site, &message))),
-            }
+fn shirt_response(app: &App, site: &Site, id: &CveId) -> Response<Cursor<Vec<u8>>> {
+    let dossier = site.cve(id);
+    let fail = |status: u16, title: &str, message: &str| {
+        html_response(status, html::shirt_error(title, message, &dossier, site))
+    };
+    match app.shirt_product(id, &site.print_png(id)) {
+        Ok(url) => redirect(&url),
+        Err(ShirtError::NotFound) => fail(
+            404,
+            "No dossier is on file.",
+            "Open the CVE page first so a name and logo can be filed, then try the T-shirt again.",
+        ),
+        Err(ShirtError::Forbidden) => fail(
+            404,
+            "This name isn't sold as a shirt here.",
+            "Famous, pre-filled dossiers keep their original branding and don't get a T-shirt button.",
+        ),
+        Err(ShirtError::NoLogo) => fail(
+            404,
+            "There is no logo to print.",
+            "This dossier was filed without a logo image, so a shirt can't be made from it.",
+        ),
+        Err(ShirtError::NoKey) => fail(
+            404,
+            "The T-shirt desk isn't set up.",
+            "This server has no Teemill key, so shirts can't be created yet.",
+        ),
+        Err(ShirtError::Failed(message)) => {
+            eprintln!("shirt {id}: {message}");
+            fail(
+                502,
+                "The T-shirt couldn't be created.",
+                "Teemill didn't finish the shirt. Wait a moment, go back to the dossier, and try again.",
+            )
         }
-    };
-    let mut raw = String::new();
-    let read = request.as_reader().take(8 * 1024).read_to_string(&mut raw);
-    if read.is_err() {
-        return respond(request, json_response(400, r#"{"ok":false,"error":"could not read the request"}"#));
     }
-    let value: serde_json::Value = match serde_json::from_str(&raw) {
-        Ok(value) => value,
-        Err(_) => return respond(request, json_response(400, r#"{"ok":false,"error":"send a JSON object with a url"}"#)),
-    };
-    let Some(url) = value.get("url").and_then(|v| v.as_str()) else {
-        return respond(request, json_response(400, r#"{"ok":false,"error":"send a JSON object with a url"}"#));
-    };
-    if !crate::print::is_teemill_product_url(url) {
-        return respond(request, json_response(400, r#"{"ok":false,"error":"that is not a Teemill product URL"}"#));
-    };
-    let branding = match cache::load(&app.cache_dir, &id) {
-        Ok(Some(branding)) => branding,
-        Ok(None) => return respond(request, json_response(404, r#"{"ok":false,"error":"no dossier is on file"}"#)),
-        Err(err) => {
-            eprintln!("teemill load {id}: {err}");
-            return respond(request, json_response(500, r#"{"ok":false,"error":"could not open the dossier"}"#));
-        }
-    };
-    if branding.prefilled {
-        return respond(request, json_response(403, r#"{"ok":false,"error":"famous names are not sold as shirts here"}"#));
-    }
-    let mut branding = branding;
-    branding.teemill_url = Some(url.trim().to_string());
-    if let Err(err) = cache::store(&app.cache_dir, &id, &branding, None) {
-        eprintln!("teemill store {id}: {err}");
-        return respond(request, json_response(500, r#"{"ok":false,"error":"could not save the T-shirt link"}"#));
-    }
-    respond(request, json_response(200, r#"{"ok":true}"#));
-}
-
-fn json_response(status: u16, body: &str) -> Response<Cursor<Vec<u8>>> {
-    Response::from_data(body.as_bytes().to_vec())
-        .with_status_code(StatusCode(status))
-        .with_header(header("Content-Type", "application/json; charset=utf-8"))
-        .with_header(header("Cache-Control", "no-store"))
-        .with_header(header("X-Content-Type-Options", "nosniff"))
 }
 
 fn render_home(app: &App, site: &Site) -> String {

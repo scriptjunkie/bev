@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use std::path::Path;
+use std::time::Duration;
 
 use image::imageops::FilterType;
 use image::{ImageFormat, ImageReader};
@@ -67,6 +68,51 @@ fn svg_to_png(bytes: &[u8]) -> Result<Vec<u8>, String> {
     pixmap
         .encode_png()
         .map_err(|e| format!("could not encode print PNG: {e}"))
+}
+
+
+const TEEMILL_CREATE: &str = "https://teemill.com/omnis/v3/product/create";
+
+/// Create a custom Teemill product and return its https product URL.
+pub fn create_product(key: &str, image_url: &str, name: &str, description: &str) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "image_url": image_url,
+        "item_code": "RNA1",
+        "colours": "White",
+        "name": name,
+        "description": description,
+        "price": 20.00
+    });
+    let body = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
+    let agent = ureq::AgentBuilder::new()
+        .timeout(Duration::from_secs(90))
+        .build();
+    let result = agent
+        .post(TEEMILL_CREATE)
+        .set("Authorization", &format!("Bearer {key}"))
+        .set("Content-Type", "application/json")
+        .set("Accept", "application/json")
+        .send_string(&body);
+    let text = match result {
+        Ok(resp) => resp
+            .into_string()
+            .map_err(|e| format!("could not read Teemill: {e}"))?,
+        Err(ureq::Error::Status(code, resp)) => {
+            let _ = resp.into_string();
+            return Err(format!("Teemill returned HTTP {code}"));
+        }
+        Err(err) => return Err(format!("could not reach Teemill: {err}")),
+    };
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|_| "Teemill returned a response that was not JSON".to_string())?;
+    let url = value
+        .get("url")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Teemill did not return a product URL".to_string())?;
+    if !is_teemill_product_url(url) {
+        return Err("Teemill returned a URL that is not a product page".into());
+    }
+    Ok(url.to_string())
 }
 
 /// Accept only https product pages on teemill.com.

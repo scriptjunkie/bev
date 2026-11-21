@@ -11,6 +11,7 @@ use crate::model::{Branding, NvdRecord};
 use crate::nvd::{NvdClient, NvdError};
 use crate::offline;
 use crate::openrouter::{ImageCut, Named, OpenRouter, IMAGE_MODEL, NAMING_MODEL};
+use crate::print;
 
 pub struct App {
     pub bind: String,
@@ -26,6 +27,15 @@ pub struct App {
 pub struct Draft {
     pub nvd: NvdRecord,
     pub named: Option<Named>,
+}
+
+
+pub enum ShirtError {
+    NotFound,
+    Forbidden,
+    NoLogo,
+    NoKey,
+    Failed(String),
 }
 
 pub enum BrandError {
@@ -192,6 +202,74 @@ impl App {
             id.sequence
         );
         Ok(branding)
+    }
+
+
+    /// Return a cached Teemill product URL, or create and file one.
+    /// Does not generate a new dossier.
+    pub fn shirt_product(&self, id: &CveId, print_url: &str) -> Result<String, ShirtError> {
+        fn cached_url(branding: &Branding) -> Option<String> {
+            branding
+                .teemill_url
+                .as_deref()
+                .filter(|url| print::is_teemill_product_url(url))
+                .map(|url| url.to_string())
+        }
+
+        let branding = match cache::load(&self.cache_dir, id) {
+            Ok(Some(branding)) => branding,
+            Ok(None) => return Err(ShirtError::NotFound),
+            Err(message) => return Err(ShirtError::Failed(message)),
+        };
+        if branding.prefilled {
+            return Err(ShirtError::Forbidden);
+        }
+        if let Some(url) = cached_url(&branding) {
+            return Ok(url);
+        }
+        let has_logo = branding
+            .logo_file
+            .as_deref()
+            .and_then(|file| cache::logo_path(&self.cache_dir, id, file))
+            .is_some();
+        if !has_logo {
+            return Err(ShirtError::NoLogo);
+        }
+        let Some(key) = self.teemill_key.as_deref() else {
+            return Err(ShirtError::NoKey);
+        };
+
+        let lock = self.cve_lock(&id.as_id());
+        let _guard = lock.lock().unwrap_or_else(|err| err.into_inner());
+        let mut branding = match cache::load(&self.cache_dir, id) {
+            Ok(Some(branding)) => branding,
+            Ok(None) => return Err(ShirtError::NotFound),
+            Err(message) => return Err(ShirtError::Failed(message)),
+        };
+        if branding.prefilled {
+            return Err(ShirtError::Forbidden);
+        }
+        if let Some(url) = cached_url(&branding) {
+            return Ok(url);
+        }
+
+        let name = format!("{} ({})", branding.name, branding.cve_id);
+        let description = if !branding.tagline.is_empty() {
+            branding.tagline.as_str()
+        } else {
+            branding.blurb.as_str()
+        };
+        eprintln!("teemill create {id}");
+        let url = print::create_product(key, print_url, &name, description).map_err(|message| {
+            eprintln!("teemill create {id}: {message}");
+            ShirtError::Failed(message)
+        })?;
+        branding.teemill_url = Some(url.clone());
+        cache::store(&self.cache_dir, id, &branding, None).map_err(|message| {
+            eprintln!("teemill store {id}: {message}");
+            ShirtError::Failed(message)
+        })?;
+        Ok(url)
     }
 
     fn cve_lock(&self, id: &str) -> Arc<Mutex<()>> {
