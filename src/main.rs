@@ -304,7 +304,7 @@ fn print_response(app: &App, site: &Site, id: &CveId) -> Response<Cursor<Vec<u8>
         Ok(bytes) => bytes,
         Err(_) => return html_response(404, missing_page(site)),
     };
-    match crate::print::logo_to_png(&bytes, name) {
+    match crate::print::logo_to_png(&bytes, name, &branding.name) {
         Ok(png) => {
             if let Some(parent) = cached.parent() {
                 let _ = std::fs::create_dir_all(parent);

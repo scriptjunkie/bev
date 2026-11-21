@@ -58,3 +58,7 @@
 /cache/2026/*
 !/cache/2026/0001/
 !/cache/2026/0001/**
+
+# On-demand shirt prints, even inside re-included dossiers.
+**/print.png
+**/print-v2.png

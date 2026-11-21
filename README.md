@@ -131,6 +131,6 @@ A new id such as `cache/2025/12345/` stays untracked.
 | CVE-2021-44228 | Log4Shell | monogram |
 | CVE-2024-6387 | regreSSHion | monogram |
 
-The Rust sources are MIT. Logo files keep the license named in their `branding.json`. The KRACK logo is CC BY-SA and is not covered by the MIT license.
+The Rust sources are MIT. Logo files keep the license named in their `branding.json`. The KRACK logo is CC BY-SA and is not covered by the MIT license. Outfit font files under `static/fonts` are SIL Open Font License 1.1.
 
 Heartbleed, Dirty COW, DROWN, Spectre, Meltdown, and KRACK link to the sites that published them. GHOST links to the Qualys advisory, Log4Shell to the Apache Logging security page, and regreSSHion to the Qualys write-up.
