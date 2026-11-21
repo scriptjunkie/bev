@@ -15,10 +15,10 @@ pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
     body.push_str(r#"<section class="hero">
       <p class="kicker">The naming desk</p>
       <h1>Every bug gets a <em>name</em>.</h1>
-      <p class="lede">Every vulnerability is important, beautiful, and valued. Some were given clever names, logos, and websites by their creators: Heartbleed was a heartbeat that read too far. Log4Shell was a log line that ran code. Most CVEs never get past the number. We now have a solution. Put in any CVE, we will read the NVD record, coin a name, and cut a logo. Every CVE is special and deserves its own website.</p>"#);
+      <p class="lede">Every vulnerability is important, beautiful, and valued. Some were given clever names, logos, and websites by their creators: Heartbleed was a heartbeat that read too far. Log4Shell was a log line that ran code. Most never got past the number. Until now, that is. Put in any CVE to coin a name and cut a logo. Every CVE is special and deserves its own website.</p>"#);
     body.push_str(&search_form(site));
     body.push_str(&format!(
-        r#"<p class="hint">A filed id comes back at once. A new one reads NVD, then waits on the two models. Or <a href="{}">draw a CVE at random</a>.</p>
+        r#"<p class="hint">Enter a CVE to generate a site for it. Or <a href="{}">draw a CVE at random</a>.</p>
     </section>"#,
         esc(&site.random())
     ));
@@ -327,7 +327,7 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 </header>
 {body}
 <footer class="foot">
-  <p>Famous names on the wall are the real ones, kept on file so they are never coined again. Anything else is named on the first request and saved under <span class="mono">cache/year/sequence</span>.</p>
+  <p>Famous names on the wall are the real ones. Anything else is named on the first request and saved.</p>
   <p>Descriptions and scores come from the NVD CVE 2.0 API. Names are asked of <span class="mono">meta-llama/llama-3.1-8b-instruct</span>. Marks are cut by <span class="mono">recraft/recraft-v4.1-flash-v2</span>.</p>
 </footer>
 </div>
