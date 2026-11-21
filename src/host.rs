@@ -33,6 +33,18 @@ impl Site {
         }
     }
 
+    /// Absolute URL for the print-ready PNG Teemill should fetch.
+    pub fn print_png(&self, id: &CveId) -> String {
+        match &self.base_domain {
+            Some(_) => format!("{}print.png", self.cve(id)),
+            None if !self.request_host.is_empty() => {
+                format!("{}/cve/{id}/print.png", self.origin(&self.request_host))
+            }
+            None => format!("/cve/{id}/print.png"),
+        }
+    }
+
+
     pub fn cve_str(&self, id: &str) -> String {
         match cve::parse(id) {
             Ok(id) => self.cve(&id),

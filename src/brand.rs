@@ -17,6 +17,7 @@ pub struct App {
     pub cache_dir: PathBuf,
     pub base_domain: Option<String>,
     pub openrouter_key: Option<String>,
+    pub teemill_key: Option<String>,
     pub nvd: NvdClient,
     pub ai: OpenRouter,
     locks: Mutex<HashMap<String, Arc<Mutex<()>>>>,
@@ -47,6 +48,10 @@ impl App {
             .ok()
             .map(|k| k.trim().to_string())
             .filter(|k| !k.is_empty() && !k.chars().any(|c| c.is_whitespace()));
+        let teemill_key = std::env::var("TEEMILL_API_KEY")
+            .ok()
+            .map(|k| k.trim().to_string())
+            .filter(|k| !k.is_empty() && !k.chars().any(|c| c.is_whitespace()));
         let base_domain = std::env::var("BASE_DOMAIN")
             .ok()
             .and_then(|value| crate::host::normalize_base(&value));
@@ -55,6 +60,7 @@ impl App {
             cache_dir,
             base_domain,
             openrouter_key,
+            teemill_key,
             nvd: NvdClient::new(nvd_key),
             ai: OpenRouter::new(),
             locks: Mutex::new(HashMap::new()),
@@ -252,6 +258,7 @@ fn assemble(id: &CveId, nvd: NvdRecord, named: &Named, image: &ImageCut, logo_so
         },
         created_at: now_rfc3339(),
         nvd,
+        teemill_url: None,
     }
 }
 

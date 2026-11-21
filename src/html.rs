@@ -39,12 +39,12 @@ pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
     layout("Brand Every Vuln — a name for every CVE", &body, site, None)
 }
 
-pub fn cve_page(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
+pub fn cve_page(branding: &Branding, cache_dir: &Path, site: &Site, teemill_key: Option<&str>) -> String {
     let title = format!("{} · {} · Brand Every Vuln", branding.name, branding.cve_id);
     let canonical = crate::cve::parse(&branding.cve_id)
         .ok()
         .and_then(|id| site.canonical_cve(&id));
-    layout(&title, &dossier(branding, cache_dir, None, site), site, canonical.as_deref())
+    layout(&title, &dossier(branding, cache_dir, None, site, teemill_key), site, canonical.as_deref())
 }
 
 pub fn trouble(status_word: &str, title: &str, message: &str, draft: Option<&Draft>, site: &Site) -> String {
@@ -72,7 +72,7 @@ pub fn trouble(status_word: &str, title: &str, message: &str, draft: Option<&Dra
     layout(&format!("{title} · Brand Every Vuln"), &body, site, None)
 }
 
-fn dossier(branding: &Branding, cache_dir: &Path, _draft_name: Option<&Named>, site: &Site) -> String {
+fn dossier(branding: &Branding, cache_dir: &Path, _draft_name: Option<&Named>, site: &Site, teemill_key: Option<&str>) -> String {
     let mut body = String::new();
     body.push_str(r#"<article class="dossier"><div class="sheet-head"><span class="file-no">"#);
     body.push_str(&esc(&branding.cve_id));
@@ -110,6 +110,7 @@ fn dossier(branding: &Branding, cache_dir: &Path, _draft_name: Option<&Named>, s
     }
     body.push_str("</p></div></div>");
     body.push_str(&metrics(branding));
+    body.push_str(&merch(branding, cache_dir, site, teemill_key));
     body.push_str(&nvd_block(&branding.nvd));
     body.push_str(&format!("<p class=\"colophon\">{}</p>", esc(&colophon(branding))));
     body.push_str(&search_form(site));
@@ -258,6 +259,64 @@ fn unfiled_card(id: &str, site: &Site) -> String {
         r#"<a class="card card-unfiled" href="{href}"><div class="plate monogram" aria-hidden="true"><span>?</span></div><div class="card-meta"><p class="id">{id}</p><h3>Not named yet</h3><p class="card-sub">Click to generate</p></div></a>"#,
         href = esc(&site.cve_str(id)),
         id = esc(id),
+    )
+}
+
+
+fn merch(branding: &Branding, cache_dir: &Path, site: &Site, teemill_key: Option<&str>) -> String {
+    if branding.prefilled {
+        return String::new();
+    }
+    let Some(key) = teemill_key.filter(|k| !k.is_empty()) else {
+        return String::new();
+    };
+    let Ok(id) = crate::cve::parse(&branding.cve_id) else {
+        return String::new();
+    };
+    let Some(file) = branding.logo_file.as_deref() else {
+        return String::new();
+    };
+    if cache::logo_path(cache_dir, &id, file).is_none() {
+        return String::new();
+    }
+    let product_attr = branding
+        .teemill_url
+        .as_deref()
+        .filter(|url| crate::print::is_teemill_product_url(url))
+        .map(|url| format!(r#" data-product-url="{}""#, esc(url)))
+        .unwrap_or_default();
+    let description = if !branding.tagline.is_empty() {
+        branding.tagline.as_str()
+    } else {
+        branding.blurb.as_str()
+    };
+    let product_name = format!("{} ({})", branding.name, branding.cve_id);
+    format!(
+        r#"<section class="merch" data-teemill-key="{key}" data-print-url="{print_url}" data-name="{name}" data-description="{desc}" data-cve="{cve}" data-save-url="/cve/{cve}/teemill"{product_attr}>
+  <div class="shirt" aria-hidden="true">
+    <svg class="shirt-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="shirt-print">
+          <rect x="62" y="78" width="76" height="76" rx="6"/>
+        </clipPath>
+      </defs>
+      <path class="shirt-body" d="M72 42c2-18 54-18 56 0l26 16 36 26-22 28-14-10v86H46V102L32 112 10 84l36-26z"/>
+      <path class="shirt-collar" d="M82 42c6 14 30 14 36 0"/>
+      <rect class="shirt-print-bg" x="62" y="78" width="76" height="76" rx="6"/>
+      <image href="/cve/{cve}/logo" x="66" y="82" width="68" height="68" preserveAspectRatio="xMidYMid meet" clip-path="url(#shirt-print)"/>
+    </svg>
+  </div>
+  <div class="merch-copy">
+    <button type="button" class="shirt-buy">Purchase this on a T-shirt</button>
+    <p class="shirt-status" hidden></p>
+  </div>
+</section>"#,
+        key = esc(key),
+        print_url = esc(&site.print_png(&id)),
+        name = esc(&product_name),
+        desc = esc(description),
+        cve = esc(&branding.cve_id),
+        product_attr = product_attr,
     )
 }
 
@@ -410,7 +469,7 @@ mod tests {
             scheme: "http".into(),
             port: Some(43123),
             request_host: "127.0.0.1".into(),
-        });
+        }, None);
         assert!(!html.contains("<script>"));
         assert!(html.contains("&lt;script&gt;"));
         assert!(html.contains("&quot;"));
@@ -446,5 +505,33 @@ mod tests {
         assert!(page.contains("Not named yet"));
         assert!(page.contains("Click to generate"));
         assert!(!page.contains("Names that stuck"));
+    }
+
+    #[test]
+    fn generated_pages_offer_a_shirt_when_a_logo_and_key_are_present() {
+        let mut branding = sample("CVE-2026-1337", "CharSlice");
+        branding.logo_file = Some("logo.webp".into());
+        branding.tagline = "A thin slice of a query log.".into();
+        let dir = std::env::temp_dir().join("bev-merch-test");
+        let dossier = dir.join("2026").join("1337");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dossier).unwrap();
+        std::fs::write(dossier.join("logo.webp"), b"not-a-real-image").unwrap();
+        let site = crate::host::Site {
+            base_domain: Some("brandeveryvuln.com".into()),
+            scheme: "https".into(),
+            port: None,
+            request_host: "cve-2026-1337.brandeveryvuln.com".into(),
+        };
+        let page = cve_page(&branding, &dir, &site, Some("test-teemill-key"));
+        assert!(page.contains("Purchase this on a T-shirt"));
+        assert!(page.contains("data-teemill-key=\"test-teemill-key\""));
+        assert!(page.contains("https://cve-2026-1337.brandeveryvuln.com/print.png"));
+        assert!(page.contains("CharSlice (CVE-2026-1337)"));
+        branding.prefilled = true;
+        let famous = cve_page(&branding, &dir, &site, Some("test-teemill-key"));
+        assert!(!famous.contains("Purchase this on a T-shirt"));
+        assert!(!famous.contains("data-teemill-key"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

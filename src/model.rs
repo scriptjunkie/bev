@@ -34,6 +34,9 @@ pub struct Branding {
     pub created_at: String,
     #[serde(default)]
     pub nvd: NvdRecord,
+    /// Cached Teemill product page, written after the first successful shirt purchase.
+    #[serde(default)]
+    pub teemill_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -130,6 +133,7 @@ pub fn sample(id: &str, name: &str) -> Branding {
         logo_source: "recraft".into(),
         logo_prompt: None,
         created_at: "2026-11-21T00:00:00Z".into(),
+        teemill_url: None,
         nvd: NvdRecord {
             description: "An English description from NVD.".into(),
             vendor: Some("openssl".into()),
