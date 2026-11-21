@@ -1,0 +1,78 @@
+{
+  "cve_id": "CVE-2014-3566",
+  "name": "POODLE",
+  "tagline": "SSLv3 padding, read one byte at a time.",
+  "blurb": "A padding-oracle attack against CBC ciphers in SSLv3. Someone in the middle can decrypt a cookie by forcing the browser to retry a connection, a byte at a time.",
+  "logo_file": null,
+  "logo_credit": null,
+  "official_site": null,
+  "official_site_label": null,
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2014-10-15T00:55:02.137Z",
+  "nvd": {
+    "description": "The SSL protocol 3.0, as used in OpenSSL through 1.0.1i and other products, uses nondeterministic CBC padding, which makes it easier for man-in-the-middle attackers to obtain cleartext data via a padding-oracle attack, aka the \"POODLE\" issue.",
+    "vendor": "openssl",
+    "product": "openssl",
+    "affected": [
+      {
+        "vendor": "openssl",
+        "product": "openssl"
+      },
+      {
+        "vendor": "ibm",
+        "product": "vios"
+      },
+      {
+        "vendor": "novell",
+        "product": "suse_linux_enterprise_software_development_kit"
+      },
+      {
+        "vendor": "oracle",
+        "product": "database"
+      },
+      {
+        "vendor": "netbsd",
+        "product": "netbsd"
+      },
+      {
+        "vendor": "novell",
+        "product": "suse_linux_enterprise_desktop"
+      },
+      {
+        "vendor": "novell",
+        "product": "suse_linux_enterprise_server"
+      },
+      {
+        "vendor": "ibm",
+        "product": "aix"
+      },
+      {
+        "vendor": "fedoraproject",
+        "product": "fedora"
+      },
+      {
+        "vendor": "redhat",
+        "product": "enterprise_linux_server_supplementary"
+      },
+      {
+        "vendor": "redhat",
+        "product": "enterprise_linux_workstation_supplementary"
+      },
+      {
+        "vendor": "debian",
+        "product": "debian_linux"
+      }
+    ],
+    "cvss": {
+      "version": "3.1",
+      "score": 3.4,
+      "severity": "LOW",
+      "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:N/A:N"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2014-3566"
+  }
+}

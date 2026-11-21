@@ -1,0 +1,78 @@
+{
+  "cve_id": "CVE-2014-6271",
+  "name": "Shellshock",
+  "tagline": "Bash runs the tail of a function definition you never called.",
+  "blurb": "Environment variables that looked like function definitions were parsed, and the text after the function was executed. Servers that handed request headers to bash inherited a remote shell.",
+  "logo_file": "logo.svg",
+  "logo_credit": "Shellshock mark by rootworks, CC0, via Openclipart.",
+  "official_site": null,
+  "official_site_label": null,
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2014-09-24T18:48:04.477Z",
+  "nvd": {
+    "description": "GNU Bash through 4.3 processes trailing strings after function definitions in the values of environment variables, which allows remote attackers to execute arbitrary code via a crafted environment, as demonstrated by vectors involving the ForceCommand feature in OpenSSH sshd, the mod_cgi and mod_cgid modules in the Apache HTTP Server, scripts executed by unspecified DHCP clients, and other situations in which setting the environment occurs across a privilege boundary from Bash execution, aka \"ShellShock.\"  NOTE: the original fix for this issue was incorrect; CVE-2014-7169 has been assigned to cover the vulnerability that is still present after the incorrect fix.",
+    "vendor": "gnu",
+    "product": "bash",
+    "affected": [
+      {
+        "vendor": "gnu",
+        "product": "bash"
+      },
+      {
+        "vendor": "ibm",
+        "product": "qradar_security_information_and_event_manager"
+      },
+      {
+        "vendor": "ibm",
+        "product": "qradar_vulnerability_manager"
+      },
+      {
+        "vendor": "vmware",
+        "product": "vcenter_server_appliance"
+      },
+      {
+        "vendor": "f5",
+        "product": "traffix_signaling_delivery_controller"
+      },
+      {
+        "vendor": "novell",
+        "product": "zenworks_configuration_management"
+      },
+      {
+        "vendor": "ibm",
+        "product": "smartcloud_entry_appliance"
+      },
+      {
+        "vendor": "f5",
+        "product": "big-ip_global_traffic_manager"
+      },
+      {
+        "vendor": "ibm",
+        "product": "software_defined_network_for_virtual_environments"
+      },
+      {
+        "vendor": "f5",
+        "product": "big-ip_local_traffic_manager"
+      },
+      {
+        "vendor": "f5",
+        "product": "big-ip_application_security_manager"
+      },
+      {
+        "vendor": "f5",
+        "product": "big-ip_link_controller"
+      }
+    ],
+    "cvss": {
+      "version": "3.1",
+      "score": 9.8,
+      "severity": "CRITICAL",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2014-6271"
+  }
+}

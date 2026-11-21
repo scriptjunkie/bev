@@ -1,0 +1,66 @@
+{
+  "cve_id": "CVE-2017-0144",
+  "name": "EternalBlue",
+  "tagline": "SMBv1, and a worm that didn't need a password.",
+  "blurb": "A flaw in Windows SMBv1 that gives remote code execution. The exploit leaked from the NSA and, weeks later, carried WannaCry from machine to machine.",
+  "logo_file": null,
+  "logo_credit": null,
+  "official_site": null,
+  "official_site_label": null,
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2017-03-17T00:59:04.010Z",
+  "nvd": {
+    "description": "The SMBv1 server in Microsoft Windows Vista SP2; Windows Server 2008 SP2 and R2 SP1; Windows 7 SP1; Windows 8.1; Windows Server 2012 Gold and R2; Windows RT 8.1; and Windows 10 Gold, 1511, and 1607; and Windows Server 2016 allows remote attackers to execute arbitrary code via crafted packets, aka \"Windows SMB Remote Code Execution Vulnerability.\" This vulnerability is different from those described in CVE-2017-0143, CVE-2017-0145, CVE-2017-0146, and CVE-2017-0148.",
+    "vendor": "microsoft",
+    "product": "server_message_block",
+    "affected": [
+      {
+        "vendor": "microsoft",
+        "product": "server_message_block"
+      },
+      {
+        "vendor": "siemens",
+        "product": "acuson_p300_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "acuson_p500_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "syngo_sc2000_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "acuson_x700_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "acuson_sc2000_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "tissue_preparation_system_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "versant_kpcr_sample_prep_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "versant_kpcr_molecular_system_firmware"
+      }
+    ],
+    "cvss": {
+      "version": "3.1",
+      "score": 8.8,
+      "severity": "HIGH",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2017-0144"
+  }
+}

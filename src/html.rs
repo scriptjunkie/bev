@@ -1,0 +1,442 @@
+use crate::brand::Draft;
+use crate::cache;
+use crate::host::Site;
+use crate::model::{format_score, severity_class, Branding};
+use crate::openrouter::Named;
+use std::path::Path;
+
+pub fn home(featured: &[Branding], rest: &[Branding], samples: &[SampleCard], cache_dir: &Path, site: &Site) -> String {
+    let mut body = String::new();
+    body.push_str(r#"<section class="hero">
+      <p class="kicker">The naming desk</p>
+      <h1>Every bug gets a <em>name</em>.</h1>
+      <p class="lede">Every vulnerability is important, beautiful, and valued. Some were given clever names, logos, and websites by their creators: Heartbleed was a heartbeat that read too far. Log4Shell was a log line that ran code. Most CVEs never get past the number. We now have a solution. Put in any CVE, we will read the NVD record, coin a name, and cut a logo. Every CVE is special and deserves its own website.</p>"#);
+    body.push_str(&search_form(site));
+    body.push_str(&format!(
+        r#"<p class="hint">A filed id comes back at once. A new one reads NVD, then waits on the two models. Or <a href="{}">draw a CVE at random</a>.</p>
+    </section>"#,
+        esc(&site.random())
+    ));
+
+    body.push_str(r#"<section class="sec" id="wall">
+      <p class="kicker">01 — Already on the wall</p>
+      <h2>Names that stuck.</h2>
+      <p class="intro">These are the real ones, the logos their authors published.</p>
+      <div class="grid">"#);
+    for branding in featured {
+        body.push_str(&card(branding, cache_dir, site));
+    }
+    body.push_str("</div><ul class=\"index\">");
+    for branding in rest {
+        body.push_str(&index_row(branding, site));
+    }
+    body.push_str("</ul></section>");
+
+    body.push_str(r#"<section class="sec" id="unnamed">
+      <p class="kicker">02 — Still a number</p>
+      <h2>No name on file.</h2>
+      <p class="intro">These exist in NVD and were not part of the famous set. Open one and the desk will coin it.</p>
+      <div class="tickets">"#);
+    for sample in samples {
+        body.push_str(&ticket(sample, site));
+    }
+    body.push_str("</div></section>");
+    layout("BrandEveryVuln — a name for every CVE", &body, site, None)
+}
+
+pub struct SampleCard {
+    pub id: String,
+    pub note: String,
+    pub filed_name: Option<String>,
+}
+
+pub fn cve_page(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
+    let title = format!("{} · {} · BrandEveryVuln", branding.name, branding.cve_id);
+    let canonical = crate::cve::parse(&branding.cve_id)
+        .ok()
+        .and_then(|id| site.canonical_cve(&id));
+    layout(&title, &dossier(branding, cache_dir, None, site), site, canonical.as_deref())
+}
+
+pub fn trouble(status_word: &str, title: &str, message: &str, draft: Option<&Draft>, site: &Site) -> String {
+    let mut body = String::new();
+    body.push_str(r#"<article class="dossier">"#);
+    body.push_str(&format!(
+        r#"<p class="kicker">{}</p><h1>{}</h1><p class="blurb">{}</p>"#,
+        esc(status_word),
+        esc(title),
+        esc(message)
+    ));
+    if let Some(draft) = draft {
+        if let Some(named) = &draft.named {
+            body.push_str(&format!(
+                r#"<p class="unstamped">{}</p><p class="blurb">{}</p>"#,
+                esc(&named.name),
+                esc(&named.tagline)
+            ));
+            body.push_str(r#"<p class="note-block">That name was not filed. A retry asks again.</p>"#);
+        }
+        body.push_str(&nvd_block(&draft.nvd));
+    }
+    body.push_str(&search_form(site));
+    body.push_str("</article>");
+    layout(&format!("{title} · BrandEveryVuln"), &body, site, None)
+}
+
+fn dossier(branding: &Branding, cache_dir: &Path, _draft_name: Option<&Named>, site: &Site) -> String {
+    let mut body = String::new();
+    body.push_str(r#"<article class="dossier"><div class="sheet-head"><span class="file-no">"#);
+    body.push_str(&esc(&branding.cve_id));
+    body.push_str("</span>");
+    body.push_str(stamp(branding));
+    body.push_str(r#"</div><div class="dossier-hero">"#);
+    body.push_str(&plate(branding, cache_dir, true));
+    body.push_str("<div>");
+    let long = if branding.name.chars().count() > 16 {
+        " class=\"long\""
+    } else {
+        ""
+    };
+    body.push_str(&format!("<h1{long}>{}</h1>", esc(&branding.name)));
+    if !branding.tagline.is_empty() {
+        body.push_str(&format!("<p class=\"tagline\">{}</p>", esc(&branding.tagline)));
+    }
+    if generated_offline(branding) {
+        body.push_str(r#"<p class="offline-note">Generated offline</p>"#);
+    }
+    if !branding.blurb.is_empty() {
+        body.push_str(&format!("<p class=\"blurb\">{}</p>", esc(&branding.blurb)));
+    }
+    body.push_str(r#"<p class="outlinks">"#);
+    body.push_str(&format!(
+        r#"<a href="{}" target="_blank" rel="noopener noreferrer">NVD entry</a>"#,
+        esc(&branding.nvd_link())
+    ));
+    if let Some((url, label)) = branding.site_link() {
+        body.push_str(&format!(
+            r#"<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>"#,
+            esc(url),
+            esc(label)
+        ));
+    }
+    body.push_str("</p></div></div>");
+    body.push_str(&metrics(branding));
+    body.push_str(&nvd_block(&branding.nvd));
+    body.push_str(&format!("<p class=\"colophon\">{}</p>", esc(&colophon(branding))));
+    body.push_str(&search_form(site));
+    body.push_str("</article>");
+    body
+}
+
+fn nvd_block(nvd: &crate::model::NvdRecord) -> String {
+    let mut body = String::from(r#"<h2>What NVD says</h2>"#);
+    let paragraphs = paragraphs(&nvd.description);
+    if paragraphs.is_empty() {
+        body.push_str(r#"<p class="desc">NVD has not published an English description.</p>"#);
+    } else {
+        for paragraph in paragraphs {
+            body.push_str(&format!("<p class=\"desc\">{}</p>", esc(&paragraph)));
+        }
+    }
+    let others: Vec<_> = nvd.affected.iter().skip(1).collect();
+    if !others.is_empty() {
+        let listed = others
+            .iter()
+            .take(6)
+            .map(|p| format!("{} / {}", pretty(&p.vendor), pretty(&p.product)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let extra = others.len().saturating_sub(6);
+        let more = if extra > 0 {
+            format!(" and {extra} more")
+        } else {
+            String::new()
+        };
+        body.push_str(&format!(
+            r#"<p class="also">Also named in the CPE data: {}{}.</p>"#,
+            esc(&listed),
+            esc(&more)
+        ));
+    }
+    if let Some(cvss) = &nvd.cvss {
+        if !cvss.vector.is_empty() {
+            body.push_str(&format!(
+                r#"<p class="vector">{}</p>"#,
+                esc(&cvss.vector)
+            ));
+        }
+    } else {
+        body.push_str(r#"<p class="vector">No CVSS vector is published for this id.</p>"#);
+    }
+    body
+}
+
+fn metrics(branding: &Branding) -> String {
+    let (score, severity, class, version) = match &branding.nvd.cvss {
+        Some(cvss) => (
+            format_score(cvss.score),
+            cvss.severity.clone(),
+            severity_class(&cvss.severity),
+            format!("CVSS {}", cvss.version),
+        ),
+        None => ("—".into(), "Not scored".into(), "sev-unknown", "CVSS".into()),
+    };
+    let vendor = branding
+        .nvd
+        .vendor
+        .as_deref()
+        .map(pretty)
+        .unwrap_or_else(|| "Not listed".into());
+    let product = branding
+        .nvd
+        .product
+        .as_deref()
+        .map(pretty)
+        .unwrap_or_else(|| "Not listed".into());
+    format!(
+        r#"<dl class="metrics">
+          <div><dt>{version}</dt><dd class="score {class}">{score}</dd></div>
+          <div><dt>Severity</dt><dd class="{class}">{severity}</dd></div>
+          <div><dt>Vendor</dt><dd class="product">{vendor}</dd></div>
+          <div><dt>Product</dt><dd class="product">{product}</dd></div>
+        </dl>"#,
+        version = esc(&version),
+        class = class,
+        score = esc(&score),
+        severity = esc(&severity),
+        vendor = esc(&vendor),
+        product = esc(&product),
+    )
+}
+
+fn generated_offline(branding: &Branding) -> bool {
+    !branding.prefilled
+        && (branding.naming_source == "offline" || branding.logo_source == "offline")
+}
+
+fn stamp(branding: &Branding) -> &'static str {
+    if branding.prefilled {
+        r#"<span class="stamp stamp-file">On file</span>"#
+    } else {
+        r#"<span class="stamp stamp-new">Just coined</span>"#
+    }
+}
+
+fn colophon(branding: &Branding) -> String {
+    let when = or_dash(&branding.created_at);
+    if branding.prefilled {
+        let credit = branding
+            .logo_credit
+            .as_deref()
+            .unwrap_or("No separate logo was published under a license this desk can keep.");
+        return format!("This is the name it already had. Filed {when}. {credit}");
+    }
+    let name_offline = branding.naming_source == "offline";
+    let logo_offline = branding.logo_source == "offline";
+    if name_offline && logo_offline {
+        format!("Name and mark generated offline from the NVD record. Filed {when}.")
+    } else if name_offline {
+        format!(
+            "Name drawn offline from the wordlist. Mark cut by {}. Filed {when}.",
+            branding.image_model.as_deref().unwrap_or("the image model")
+        )
+    } else if logo_offline {
+        format!(
+            "Coined {when} by {}. Mark drawn offline.",
+            branding.naming_model.as_deref().unwrap_or("the naming model")
+        )
+    } else {
+        format!(
+            "Coined {when} by {}. Mark cut by {}.",
+            branding.naming_model.as_deref().unwrap_or("the naming model"),
+            branding.image_model.as_deref().unwrap_or("the image model")
+        )
+    }
+}
+
+fn card(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
+    format!(
+        r#"<a class="card" href="{href}">{plate}<div><p class="id">{id}</p><h3>{name}</h3><p class="tag">{tag}</p></div></a>"#,
+        href = esc(&site.cve_str(&branding.cve_id)),
+        id = esc(&branding.cve_id),
+        plate = plate(branding, cache_dir, false),
+        name = esc(&branding.name),
+        tag = esc(&branding.tagline),
+    )
+}
+
+fn index_row(branding: &Branding, site: &Site) -> String {
+    format!(
+        r#"<li><a href="{href}"><span class="nm">{name}</span><span class="id">{id}</span></a></li>"#,
+        href = esc(&site.cve_str(&branding.cve_id)),
+        id = esc(&branding.cve_id),
+        name = esc(&branding.name),
+    )
+}
+
+fn ticket(sample: &SampleCard, site: &Site) -> String {
+    let eyebrow = match &sample.filed_name {
+        Some(name) => format!("Filed as {name}"),
+        None => "No name on file".into(),
+    };
+    format!(
+        r#"<a class="ticket" href="{href}"><span class="eyebrow">{eyebrow}</span><strong>{id}</strong><span class="note">{note}</span></a>"#,
+        href = esc(&site.cve_str(&sample.id)),
+        id = esc(&sample.id),
+        eyebrow = esc(&eyebrow),
+        note = esc(&sample.note),
+    )
+}
+
+fn plate(branding: &Branding, cache_dir: &Path, large: bool) -> String {
+    let class = if large { "plate plate-lg" } else { "plate" };
+    let has_logo = branding.logo_file.as_deref().and_then(|name| {
+        crate::cve::parse(&branding.cve_id)
+            .ok()
+            .and_then(|id| cache::logo_path(cache_dir, &id, name))
+    });
+    if has_logo.is_some() {
+        format!(
+            r#"<div class="{class}"><img src="/cve/{id}/logo" alt="{alt} logo"></div>"#,
+            id = esc(&branding.cve_id),
+            alt = esc(&branding.name),
+        )
+    } else {
+        format!(
+            r#"<div class="{class} monogram" aria-hidden="true"><span>{}</span></div>"#,
+            esc(&initials(&branding.name))
+        )
+    }
+}
+
+fn search_form(site: &Site) -> String {
+    format!(
+        r#"<form class="search" action="{action}" method="get">
+      <label class="sr" for="cve-id">CVE identifier</label>
+      <input id="cve-id" name="id" placeholder="CVE-2026-0001" autocomplete="off" spellcheck="false" autocapitalize="characters" maxlength="22" required>
+      <button type="submit">Name it</button>
+    </form>"#,
+        action = esc(&site.lookup()),
+    )
+}
+
+fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> String {
+    let canonical = canonical
+        .map(|url| format!(r#"<link rel="canonical" href="{}">"#, esc(url)))
+        .unwrap_or_default();
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content="BrandEveryVuln gives a CVE a name and a logo. Famous bugs keep the names they already had.">
+<meta property="og:site_name" content="BrandEveryVuln">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="BrandEveryVuln gives a CVE a name and a logo. Famous bugs keep the names they already had.">
+{canonical}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="frame">
+<header class="top">
+  <a class="word" href="{home}"><span class="seal" aria-hidden="true"></span>BrandEveryVuln</a>
+  <nav>
+    <a href="{wall}">The wall</a>
+    <a href="{unnamed}">Unnamed</a>
+    <a class="btn" href="{random}">Random CVE</a>
+  </nav>
+</header>
+{body}
+<footer class="foot">
+  <p>Famous names on the wall are the real ones, kept on file so they are never coined again. Anything else is named on the first request and saved under <span class="mono">cache/year/sequence</span>.</p>
+  <p>Descriptions and scores come from the NVD CVE 2.0 API. Names are asked of <span class="mono">meta-llama/llama-3.1-8b-instruct</span>. Marks are cut by <span class="mono">recraft/recraft-v4.1-flash-v2</span>.</p>
+</footer>
+</div>
+</body>
+</html>"#,
+        title = esc(title),
+        home = esc(&site.home()),
+        wall = esc(&site.wall()),
+        unnamed = esc(&site.unnamed()),
+        random = esc(&site.random()),
+    )
+}
+
+fn paragraphs(text: &str) -> Vec<String> {
+    text.split("\n\n")
+        .map(|block| block.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect()
+}
+
+fn pretty(value: &str) -> String {
+    value.replace('_', " ")
+}
+
+fn initials(name: &str) -> String {
+    let mut out = String::new();
+    for word in name.split_whitespace() {
+        if let Some(ch) = word.chars().find(|c| c.is_ascii_alphabetic()) {
+            out.push(ch.to_ascii_uppercase());
+        }
+        if out.chars().count() == 2 {
+            break;
+        }
+    }
+    if out.is_empty() {
+        out.push('·');
+    }
+    out
+}
+
+fn or_dash(value: &str) -> &str {
+    if value.is_empty() { "an unknown time" } else { value }
+}
+
+pub fn esc(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+pub const FAVICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<rect width="32" height="32" fill="#14110e"/>
+<rect x="6" y="6" width="20" height="20" fill="#f4efe4"/>
+<rect x="6" y="6" width="8" height="8" fill="#e23b2b"/>
+</svg>"##;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::sample;
+
+    #[test]
+    fn escapes_markup_in_the_description() {
+        let mut branding = sample("CVE-2026-0001", "Latchlight");
+        branding.nvd.description = "A <script>alert(1)</script> bug.".into();
+        branding.tagline = "Quotes \" and <angles>".into();
+        let html = cve_page(&branding, Path::new("/nope"), &crate::host::Site {
+            base_domain: None,
+            scheme: "http".into(),
+            port: Some(43123),
+            request_host: "127.0.0.1".into(),
+        });
+        assert!(!html.contains("<script>"));
+        assert!(html.contains("&lt;script&gt;"));
+        assert!(html.contains("&quot;"));
+        assert!(html.contains("Latchlight"));
+        assert!(html.contains("7.5"));
+    }
+}

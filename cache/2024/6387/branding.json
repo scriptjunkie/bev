@@ -1,0 +1,78 @@
+{
+  "cve_id": "CVE-2024-6387",
+  "name": "regreSSHion",
+  "tagline": "A signal handler in sshd, raced into remote root.",
+  "blurb": "OpenSSH's server called async-signal-unsafe functions from a SIGALRM handler. Hit the race and a remote client can run code as root on glibc Linux. Qualys named it regreSSHion, a regression of an old bug.",
+  "logo_file": null,
+  "logo_credit": null,
+  "official_site": "https://blog.qualys.com/vulnerabilities-threat-research/2024/07/01/regresshion-remote-unauthenticated-code-execution-vulnerability-in-openssh-server",
+  "official_site_label": "Original write-up",
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2024-07-01T13:15:06.467Z",
+  "nvd": {
+    "description": "A security regression (CVE-2006-5051) was discovered in OpenSSH's server (sshd). There is a race condition which can lead sshd to handle some signals in an unsafe manner. An unauthenticated, remote attacker may be able to trigger it by failing to authenticate within a set time period.",
+    "vendor": "openbsd",
+    "product": "openssh",
+    "affected": [
+      {
+        "vendor": "openbsd",
+        "product": "openssh"
+      },
+      {
+        "vendor": "netapp",
+        "product": "ontap_tools"
+      },
+      {
+        "vendor": "netapp",
+        "product": "active_iq_unified_manager"
+      },
+      {
+        "vendor": "redhat",
+        "product": "openshift_container_platform"
+      },
+      {
+        "vendor": "netapp",
+        "product": "e-series_santricity_os_controller"
+      },
+      {
+        "vendor": "netapp",
+        "product": "ontap"
+      },
+      {
+        "vendor": "netapp",
+        "product": "ontap_select_deploy_administration_utility"
+      },
+      {
+        "vendor": "freebsd",
+        "product": "freebsd"
+      },
+      {
+        "vendor": "canonical",
+        "product": "ubuntu_linux"
+      },
+      {
+        "vendor": "apple",
+        "product": "macos"
+      },
+      {
+        "vendor": "redhat",
+        "product": "enterprise_linux_eus"
+      },
+      {
+        "vendor": "arista",
+        "product": "eos"
+      }
+    ],
+    "cvss": {
+      "version": "3.1",
+      "score": 8.1,
+      "severity": "HIGH",
+      "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2024-6387"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "cve_id": "CVE-2017-5754",
+  "name": "Meltdown",
+  "tagline": "Kernel memory, observed from user space, via the cache.",
+  "blurb": "A speculative load can read privileged memory and leave a cache trace behind, even though the architectural result is thrown away. Meltdown is that trace, made reliable.",
+  "logo_file": "logo.svg",
+  "logo_credit": "Meltdown logo by Natascha Eibl, CC0, from meltdownattack.com.",
+  "official_site": "https://meltdownattack.com/",
+  "official_site_label": "Official site",
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2018-01-04T13:29:00.303Z",
+  "nvd": {
+    "description": "Systems with microprocessors utilizing speculative execution and indirect branch prediction may allow unauthorized disclosure of information to an attacker with local user access via a side-channel analysis of the data cache.",
+    "vendor": "intel",
+    "product": "core_i5",
+    "affected": [
+      {
+        "vendor": "intel",
+        "product": "core_i5"
+      },
+      {
+        "vendor": "intel",
+        "product": "core_i7"
+      },
+      {
+        "vendor": "intel",
+        "product": "core_i3"
+      },
+      {
+        "vendor": "intel",
+        "product": "xeon_e5"
+      },
+      {
+        "vendor": "intel",
+        "product": "xeon"
+      },
+      {
+        "vendor": "intel",
+        "product": "xeon_e7"
+      },
+      {
+        "vendor": "intel",
+        "product": "xeon_gold"
+      },
+      {
+        "vendor": "intel",
+        "product": "atom_c"
+      },
+      {
+        "vendor": "intel",
+        "product": "atom_z"
+      },
+      {
+        "vendor": "intel",
+        "product": "celeron_n"
+      },
+      {
+        "vendor": "intel",
+        "product": "xeon_platinum"
+      },
+      {
+        "vendor": "intel",
+        "product": "xeon_phi"
+      }
+    ],
+    "cvss": {
+      "version": "3.1",
+      "score": 5.6,
+      "severity": "MEDIUM",
+      "vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:C/C:H/I:N/A:N"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2017-5754"
+  }
+}

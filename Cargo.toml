@@ -1,0 +1,15 @@
+[package]
+name = "vulnmark"
+version = "0.1.0"
+edition = "2021"
+description = "A synchronous desk that names CVEs and cuts a logo for them"
+publish = false
+# Rust sources are MIT. Logo files under cache/ keep the license named in each branding.json.
+license = "MIT"
+
+[dependencies]
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+ureq = "2.12"

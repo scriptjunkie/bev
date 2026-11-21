@@ -1,0 +1,42 @@
+{
+  "cve_id": "CVE-2016-0800",
+  "name": "DROWN",
+  "tagline": "Old SSLv2 still knows how to read modern TLS.",
+  "blurb": "Servers that never disabled SSLv2, or that shared a key with one that didn't, could have their TLS sessions decrypted. The attack uses a dead protocol to read a live one.",
+  "logo_file": "logo.svg",
+  "logo_credit": "DROWN logo by Sarah Madden, CC0, from drownattack.com.",
+  "official_site": "https://drownattack.com/",
+  "official_site_label": "Official site",
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2016-03-01T20:59:00.253Z",
+  "nvd": {
+    "description": "The SSLv2 protocol, as used in OpenSSL before 1.0.1s and 1.0.2 before 1.0.2g and other products, requires a server to send a ServerVerify message before establishing that a client possesses certain plaintext RSA data, which makes it easier for remote attackers to decrypt TLS ciphertext data by leveraging a Bleichenbacher RSA padding oracle, aka a \"DROWN\" attack.",
+    "vendor": "openssl",
+    "product": "openssl",
+    "affected": [
+      {
+        "vendor": "openssl",
+        "product": "openssl"
+      },
+      {
+        "vendor": "pulsesecure",
+        "product": "client"
+      },
+      {
+        "vendor": "pulsesecure",
+        "product": "steel_belted_radius"
+      }
+    ],
+    "cvss": {
+      "version": "3.0",
+      "score": 5.9,
+      "severity": "MEDIUM",
+      "vector": "CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2016-0800"
+  }
+}

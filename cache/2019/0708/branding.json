@@ -1,0 +1,78 @@
+{
+  "cve_id": "CVE-2019-0708",
+  "name": "BlueKeep",
+  "tagline": "Remote Desktop, before login, and it can be wormed.",
+  "blurb": "A pre-authentication bug in Remote Desktop on older Windows. It can run code without a password, and it can be aimed at the next machine over.",
+  "logo_file": null,
+  "logo_credit": null,
+  "official_site": null,
+  "official_site_label": null,
+  "prefilled": true,
+  "naming_model": null,
+  "image_model": null,
+  "naming_source": "canonical",
+  "logo_prompt": null,
+  "created_at": "2019-05-16T19:29:00.427Z",
+  "nvd": {
+    "description": "A remote code execution vulnerability exists in Remote Desktop Services formerly known as Terminal Services when an unauthenticated attacker connects to the target system using RDP and sends specially crafted requests, aka 'Remote Desktop Services Remote Code Execution Vulnerability'.",
+    "vendor": "microsoft",
+    "product": "windows_server_2008",
+    "affected": [
+      {
+        "vendor": "microsoft",
+        "product": "windows_server_2008"
+      },
+      {
+        "vendor": "microsoft",
+        "product": "windows_7"
+      },
+      {
+        "vendor": "siemens",
+        "product": "syngo_lab_process_manager"
+      },
+      {
+        "vendor": "huawei",
+        "product": "gtsoftx3000_firmware"
+      },
+      {
+        "vendor": "huawei",
+        "product": "oceanstor_hvs85t_firmware"
+      },
+      {
+        "vendor": "huawei",
+        "product": "oceanstor_hvs88t_firmware"
+      },
+      {
+        "vendor": "huawei",
+        "product": "agile_controller-campus_firmware"
+      },
+      {
+        "vendor": "huawei",
+        "product": "smc2.0_firmware"
+      },
+      {
+        "vendor": "huawei",
+        "product": "uma_firmware"
+      },
+      {
+        "vendor": "huawei",
+        "product": "ch242_v3_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "multix_pro_navy_firmware"
+      },
+      {
+        "vendor": "siemens",
+        "product": "multix_swing_firmware"
+      }
+    ],
+    "cvss": {
+      "version": "3.1",
+      "score": 9.8,
+      "severity": "CRITICAL",
+      "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    },
+    "nvd_url": "https://nvd.nist.gov/vuln/detail/CVE-2019-0708"
+  }
+}
