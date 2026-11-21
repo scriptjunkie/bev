@@ -13,7 +13,6 @@ pub enum ExploreCard {
 pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
     let mut body = String::new();
     body.push_str(r#"<section class="hero">
-      <p class="kicker">The naming desk</p>
       <h1>
         <span class="sr">Every bug gets a name, website, and logo.</span>
         <span class="hero-title" aria-hidden="true">Every bug gets a <span class="swap"><span class="swap-word swap-name"><em>name</em>.</span><span class="swap-word swap-website"><em>website</em>.</span><span class="swap-word swap-logo"><em>logo</em>.</span></span></span>
@@ -37,11 +36,11 @@ pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
         }
     }
     body.push_str("</div></section>");
-    layout("BrandEveryVuln — a name for every CVE", &body, site, None)
+    layout("Brand Every Vuln — a name for every CVE", &body, site, None)
 }
 
 pub fn cve_page(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
-    let title = format!("{} · {} · BrandEveryVuln", branding.name, branding.cve_id);
+    let title = format!("{} · {} · Bran Every Vuln", branding.name, branding.cve_id);
     let canonical = crate::cve::parse(&branding.cve_id)
         .ok()
         .and_then(|id| site.canonical_cve(&id));
@@ -70,7 +69,7 @@ pub fn trouble(status_word: &str, title: &str, message: &str, draft: Option<&Dra
     }
     body.push_str(&search_form(site));
     body.push_str("</article>");
-    layout(&format!("{title} · BrandEveryVuln"), &body, site, None)
+    layout(&format!("{title} · Brand Every Vuln"), &body, site, None)
 }
 
 fn dossier(branding: &Branding, cache_dir: &Path, _draft_name: Option<&Named>, site: &Site) -> String {
@@ -310,10 +309,10 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
-<meta name="description" content="BrandEveryVuln gives a CVE a name and a logo. Famous bugs keep the names they already had.">
-<meta property="og:site_name" content="BrandEveryVuln">
+<meta name="description" content="Brand Every Vuln gives every CVE a name, logo, and website.">
+<meta property="og:site_name" content="Brand Every Vuln">
 <meta property="og:title" content="{title}">
-<meta property="og:description" content="BrandEveryVuln gives a CVE a name and a logo. Famous bugs keep the names they already had.">
+<meta property="og:description" content="Brand Every Vuln gives every CVE a name, logo, and website.">
 {canonical}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
@@ -322,7 +321,7 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 <body{base_attr}>
 <div class="frame">
 <header class="top">
-  <a class="word" href="{home}"><span class="seal" aria-hidden="true"></span>BrandEveryVuln</a>
+  <a class="word" href="{home}"><span class="seal" aria-hidden="true"></span>Brand Every Vuln</a>
   <nav>
     <a href="{explore}">Explore</a>
     <a class="btn" href="{random}">Random CVE</a>
