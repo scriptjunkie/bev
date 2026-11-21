@@ -181,6 +181,33 @@ h1 em {
   color: var(--brass);
 }
 
+.hero-title {
+  display: block;
+}
+
+.swap {
+  display: inline-grid;
+  justify-items: start;
+  align-items: baseline;
+  vertical-align: baseline;
+}
+
+.swap-word {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  animation: word-fade 9s ease-in-out infinite;
+}
+
+.swap-name { animation-delay: 0s; }
+.swap-website { animation-delay: -6s; }
+.swap-logo { animation-delay: -3s; }
+
+@keyframes word-fade {
+  0%, 26% { opacity: 1; }
+  33.333%, 92.667% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
 .lede {
   margin: 22px 0 0;
   max-width: 58ch;
@@ -645,4 +672,9 @@ h1 em {
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto; }
+  .swap-word {
+    animation: none;
+    opacity: 0;
+  }
+  .swap-name { opacity: 1; }
 }
