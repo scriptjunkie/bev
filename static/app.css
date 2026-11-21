@@ -195,16 +195,17 @@ h1 em {
 .swap-word {
   grid-area: 1 / 1;
   white-space: nowrap;
-  animation: word-fade 9s ease-in-out infinite;
+  animation: word-fade 12s ease-in-out infinite;
 }
 
 .swap-name { animation-delay: 0s; }
-.swap-website { animation-delay: -6s; }
-.swap-logo { animation-delay: -3s; }
+.swap-website { animation-delay: -9s; }
+.swap-logo { animation-delay: -6s; }
+.swap-tshirt { animation-delay: -3s; }
 
 @keyframes word-fade {
-  0%, 26% { opacity: 1; }
-  33.333%, 92.667% { opacity: 0; }
+  0%, 19.5% { opacity: 1; }
+  25%, 94.5% { opacity: 0; }
   100% { opacity: 1; }
 }
 

@@ -14,8 +14,8 @@ pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
     let mut body = String::new();
     body.push_str(r#"<section class="hero">
       <h1>
-        <span class="sr">Every bug gets a name, website, and logo.</span>
-        <span class="hero-title" aria-hidden="true">Every bug gets a <span class="swap"><span class="swap-word swap-name"><em>name</em>.</span><span class="swap-word swap-website"><em>website</em>.</span><span class="swap-word swap-logo"><em>logo</em>.</span></span></span>
+        <span class="sr">Every bug gets a name, website, logo, and T-shirt.</span>
+        <span class="hero-title" aria-hidden="true">Every bug gets a <span class="swap"><span class="swap-word swap-name"><em>name</em>.</span><span class="swap-word swap-website"><em>website</em>.</span><span class="swap-word swap-logo"><em>logo</em>.</span><span class="swap-word swap-tshirt"><em>T-shirt</em>.</span></span></span>
       </h1>
       <p class="lede">Every vulnerability is important, beautiful, and valued. Some were given clever names, logos, and websites by their creators: Heartbleed was a heartbeat that read too far. Log4Shell was a log line that ran code. Most never got past the number. Until now, that is. Put in any CVE to coin a name and cut a logo. Every CVE is special and deserves its own website.</p>"#);
     body.push_str(&search_form(site));
@@ -490,10 +490,11 @@ mod tests {
         };
         let page = home(&cards, Path::new("/nope"), &site);
         assert!(page.contains("Explore the names"));
-        assert!(page.contains("Every bug gets a name, website, and logo."));
+        assert!(page.contains("Every bug gets a name, website, logo, and T-shirt."));
         assert!(page.contains(r#"<span class="swap-word swap-name"><em>name</em>.</span>"#));
         assert!(page.contains(r#"<span class="swap-word swap-website"><em>website</em>.</span>"#));
         assert!(page.contains(r#"<span class="swap-word swap-logo"><em>logo</em>.</span>"#));
+        assert!(page.contains(r#"<span class="swap-word swap-tshirt"><em>T-shirt</em>.</span>"#));
         assert!(page.contains(r#"aria-hidden="true""#));
         assert!(page.contains("data-base-domain=\"brandeveryvuln.com\""));
         assert!(page.contains(r#"<script src="/static/app.js" defer></script>"#));
