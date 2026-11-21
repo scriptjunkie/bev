@@ -386,7 +386,7 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 {body}
 <footer class="foot">
   <p>Famous names on the wall are the real ones. Anything else is named on the first request and saved.</p>
-  <p>Descriptions and scores come from the NVD CVE 2.0 API. Names are asked of <span class="mono">meta-llama/llama-3.1-8b-instruct</span>. Marks are cut by <span class="mono">recraft/recraft-v4.1-flash-v2</span>.</p>
+  <p>Descriptions and scores come from the NVD CVE 2.0 API.</p>
 </footer>
 </div>
 </body>
