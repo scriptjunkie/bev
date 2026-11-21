@@ -55,12 +55,8 @@ impl Site {
         self.absolute_apex("/")
     }
 
-    pub fn wall(&self) -> String {
-        self.absolute_apex("/#wall")
-    }
-
-    pub fn unnamed(&self) -> String {
-        self.absolute_apex("/#unnamed")
+    pub fn explore(&self) -> String {
+        self.absolute_apex("/#explore")
     }
 
     pub fn random(&self) -> String {

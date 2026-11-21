@@ -1,11 +1,12 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
-use crate::cve::CveId;
+use crate::brand::civil_from_days;
+use crate::cve::{self, CveId};
 use crate::model::{Cvss, NvdRecord, Product};
 
 const NVD_URL: &str = "https://services.nvd.nist.gov/rest/json/cves/2.0";
@@ -94,6 +95,59 @@ impl NvdClient {
         Err(NvdError::Failed(last))
     }
 
+
+    /// Pick a random CVE from CISA's KEV window via NVD's kevStartDate/kevEndDate,
+    /// biased toward recent years over the past 5 years.
+    pub fn fetch_random_kev<F>(&self, mut next_rand: F) -> Option<CveId>
+    where
+        F: FnMut() -> u64,
+    {
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        for attempt in 0..3 {
+            let (start, end) = pick_kev_week(now_secs, next_rand(), next_rand());
+            let url = format!("{NVD_URL}/?kevStartDate={start}&kevEndDate={end}");
+            self.pace();
+            let mut req = self
+                .agent
+                .get(&url)
+                .set("Accept", "application/json");
+            if let Some(key) = &self.api_key {
+                req = req.set("apiKey", key);
+            }
+            match req.call() {
+                Ok(resp) => {
+                    let body = resp.into_string().unwrap_or_default();
+                    match parse_kev_ids(&body) {
+                        Ok(ids) if !ids.is_empty() => {
+                            let idx = (next_rand() as usize) % ids.len();
+                            return Some(ids[idx].clone());
+                        }
+                        Ok(_) => {
+                            eprintln!("nvd kev {start}..{end} empty (attempt {})", attempt + 1);
+                        }
+                        Err(err) => {
+                            eprintln!("nvd kev parse error: {err}");
+                        }
+                    }
+                }
+                Err(ureq::Error::Status(code, _)) => {
+                    eprintln!("nvd kev HTTP {code} for {start}..{end}");
+                    if matches!(code, 403 | 429 | 503) {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    eprintln!("nvd kev transport error: {err}");
+                    break;
+                }
+            }
+        }
+        None
+    }
+
     /// NVD allows about 5 requests / 30s without a key. Stay under that.
     fn pace(&self) {
         let limit = if self.api_key.is_some() { 8 } else { 4 };
@@ -122,6 +176,56 @@ impl NvdClient {
             }
         }
     }
+}
+
+
+/// Pick a 7-day UTC window within the past 5 years, weighted exponentially
+/// toward recent years (weights [16, 8, 4, 2, 1] for 0..4 years ago).
+pub fn pick_kev_week(now_secs: u64, r_year: u64, r_day: u64) -> (String, String) {
+    const WEIGHTS: [u64; 5] = [16, 8, 4, 2, 1];
+    let total: u64 = WEIGHTS.iter().sum();
+    let mut pick = r_year % total;
+    let mut bucket = 0usize;
+    for (idx, w) in WEIGHTS.iter().enumerate() {
+        if pick < *w {
+            bucket = idx;
+            break;
+        }
+        pick -= *w;
+    }
+    let today_days = (now_secs / 86_400) as i64;
+    let days_in_year = (r_day % 358) as i64;
+    let end_day = today_days - (bucket as i64 * 365 + days_in_year);
+    let start_day = end_day - 7;
+    let (sy, sm, sd) = civil_from_days(start_day);
+    let (ey, em, ed) = civil_from_days(end_day);
+    (
+        format!("{sy:04}-{sm:02}-{sd:02}T00:00:00.000Z"),
+        format!("{ey:04}-{em:02}-{ed:02}T23:59:59.000Z"),
+    )
+}
+
+pub fn parse_kev_ids(body: &str) -> Result<Vec<CveId>, NvdError> {
+    let value: Value = serde_json::from_str(body)
+        .map_err(|_| NvdError::Failed("NVD returned something that was not JSON.".into()))?;
+    let vulns = value
+        .get("vulnerabilities")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut ids = Vec::new();
+    for item in vulns {
+        if let Some(raw) = item
+            .get("cve")
+            .and_then(|c| c.get("id"))
+            .and_then(|v| v.as_str())
+        {
+            if let Ok(id) = cve::parse(raw) {
+                ids.push(id);
+            }
+        }
+    }
+    Ok(ids)
 }
 
 pub fn parse_body(body: &str, id: &CveId) -> Result<NvdRecord, NvdError> {
@@ -500,5 +604,32 @@ mod tests {
         let parts = split_unescaped(r"cpe:2.3:a:acme:widget\:pro:1.0");
         assert_eq!(parts[3], "acme");
         assert_eq!(parts[4], "widget:pro");
+    }
+
+    #[test]
+    fn kev_week_stays_within_five_years_and_parses_ids() {
+        let now = 1_795_200_000; // ~2026-11
+        let (s, e) = pick_kev_week(now, 0, 10);
+        assert!(s.ends_with("T00:00:00.000Z"));
+        assert!(e.ends_with("T23:59:59.000Z"));
+        assert!(s < e);
+
+        // Highest bucket (4 years ago)
+        let (s_old, e_old) = pick_kev_week(now, 30, 357);
+        assert!(s_old < e_old);
+        assert!(s_old < s);
+
+        let body = r#"{
+            "totalResults": 2,
+            "vulnerabilities": [
+                {"cve": {"id": "CVE-2026-1337"}},
+                {"cve": {"id": "CVE-2025-12345"}},
+                {"cve": {"id": "not-a-cve"}}
+            ]
+        }"#;
+        let ids = parse_kev_ids(body).unwrap();
+        assert_eq!(ids.len(), 2);
+        assert_eq!(ids[0].as_id(), "CVE-2026-1337");
+        assert_eq!(ids[1].as_id(), "CVE-2025-12345");
     }
 }

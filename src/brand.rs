@@ -273,7 +273,7 @@ fn rfc3339(secs: u64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
-fn civil_from_days(days_since_unix: i64) -> (i32, u32, u32) {
+pub(crate) fn civil_from_days(days_since_unix: i64) -> (i32, u32, u32) {
     let z = days_since_unix + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = (z - era * 146_097) as u64;

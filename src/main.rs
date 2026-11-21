@@ -23,7 +23,7 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use crate::brand::{App, BrandError};
 use crate::cve::CveId;
 use crate::host::{HostClass, Site};
-use crate::html::SampleCard;
+use crate::html::ExploreCard;
 
 const FONTS: &[&str] = &[
     "fraunces-normal-560.woff2",
@@ -35,7 +35,7 @@ const FONTS: &[&str] = &[
     "ibm-plex-mono-normal-500.woff2",
 ];
 
-const CSP: &str = "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
 
 fn main() {
     load_dotenv();
@@ -136,7 +136,7 @@ fn route(app: &App, request: Request) {
         return respond(request, html_response(200, render_home(app, &site)));
     }
     if path == "/random" {
-        let id = random_id(&app.cache_dir);
+        let id = random_id(app);
         return respond(request, redirect(&site.cve(&id)));
     }
     if path == "/lookup" {
@@ -159,6 +159,10 @@ fn asset_response(path: &str) -> Option<Response<Cursor<Vec<u8>>>> {
     if path == "/static/app.css" {
         let css = read_project("static/app.css").unwrap_or_else(|| b"body{font-family:georgia,serif}".to_vec());
         return Some(bytes_response(200, "text/css; charset=utf-8", &css, "public, max-age=3600"));
+    }
+    if path == "/static/app.js" {
+        let js = read_project("static/app.js").unwrap_or_default();
+        return Some(bytes_response(200, "application/javascript; charset=utf-8", &js, "public, max-age=3600"));
     }
     if let Some(name) = path.strip_prefix("/static/fonts/") {
         if FONTS.contains(&name) {
@@ -257,37 +261,21 @@ fn logo_response(app: &App, site: &Site, id: &CveId) -> Response<Cursor<Vec<u8>>
 }
 
 fn render_home(app: &App, site: &Site) -> String {
-    let mut featured = Vec::new();
-    let mut rest = Vec::new();
-    for canon in famous::CANON {
-        let Ok(id) = cve::parse(canon.id) else { continue };
-        match cache::load(&app.cache_dir, &id) {
-            Ok(Some(branding)) => {
-                if canon.featured {
-                    featured.push(branding);
-                } else {
-                    rest.push(branding);
-                }
-            }
-            Ok(None) => eprintln!("missing prefilled dossier {}", canon.id),
-            Err(err) => eprintln!("prefilled {}: {err}", canon.id),
-        }
-    }
-    let samples = famous::SAMPLES
+    let cards = famous::EXPLORE_IDS
         .iter()
-        .map(|sample| {
-            let filed_name = cve::parse(sample.id)
-                .ok()
-                .and_then(|id| cache::load(&app.cache_dir, &id).ok().flatten())
-                .map(|branding| branding.name);
-            SampleCard {
-                id: sample.id.to_string(),
-                note: sample.note.to_string(),
-                filed_name,
+        .filter_map(|raw| {
+            let id = cve::parse(raw).ok()?;
+            match cache::load(&app.cache_dir, &id) {
+                Ok(Some(branding)) => Some(ExploreCard::Filed(branding)),
+                Ok(None) => Some(ExploreCard::Unfiled { id: id.as_id() }),
+                Err(err) => {
+                    eprintln!("explore {}: {err}", id);
+                    Some(ExploreCard::Unfiled { id: id.as_id() })
+                }
             }
         })
         .collect::<Vec<_>>();
-    html::home(&featured, &rest, &samples, &app.cache_dir, site)
+    html::home(&cards, &app.cache_dir, site)
 }
 
 fn invalid_page(site: &Site, message: &str) -> String {
@@ -310,30 +298,19 @@ fn missing_page(site: &Site) -> String {
     )
 }
 
-fn random_id(cache_dir: &std::path::Path) -> CveId {
-    let roll = mix() % 100;
-    if roll < 42 {
-        let canon = &famous::CANON[(mix() as usize) % famous::CANON.len()];
-        return cve::parse(canon.id).expect("canon id");
+fn random_id(app: &App) -> CveId {
+    if let Some(id) = app.nvd.fetch_random_kev(mix) {
+        return id;
     }
-    if roll < 60 {
-        let ids = cache::list_ids(cache_dir);
-        if !ids.is_empty() {
-            let id = &ids[(mix() as usize) % ids.len()];
-            if let Ok(parsed) = cve::parse(id) {
-                return parsed;
-            }
+    let ids = cache::list_ids(&app.cache_dir);
+    if !ids.is_empty() {
+        let id = &ids[(mix() as usize) % ids.len()];
+        if let Ok(parsed) = cve::parse(id) {
+            return parsed;
         }
     }
-    let year = 2023 + (mix() % 4);
-    let seq = if year == 2026 {
-        format!("{:04}", 1 + (mix() % 8000))
-    } else if mix() % 4 == 0 {
-        format!("{}", 10_000 + (mix() % 30_000))
-    } else {
-        format!("{:04}", 1000 + (mix() % 9000))
-    };
-    cve::parse(&format!("CVE-{year}-{seq}")).expect("generated id")
+    let canon = &famous::CANON[(mix() as usize) % famous::CANON.len()];
+    cve::parse(canon.id).expect("canon id")
 }
 
 fn mix() -> u64 {

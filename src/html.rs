@@ -5,7 +5,12 @@ use crate::model::{format_score, severity_class, Branding};
 use crate::openrouter::Named;
 use std::path::Path;
 
-pub fn home(featured: &[Branding], rest: &[Branding], samples: &[SampleCard], cache_dir: &Path, site: &Site) -> String {
+pub enum ExploreCard {
+    Filed(Branding),
+    Unfiled { id: String },
+}
+
+pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
     let mut body = String::new();
     body.push_str(r#"<section class="hero">
       <p class="kicker">The naming desk</p>
@@ -18,36 +23,18 @@ pub fn home(featured: &[Branding], rest: &[Branding], samples: &[SampleCard], ca
         esc(&site.random())
     ));
 
-    body.push_str(r#"<section class="sec" id="wall">
-      <p class="kicker">01 — Already on the wall</p>
-      <h2>Names that stuck.</h2>
-      <p class="intro">These are the real ones, the logos their authors published.</p>
+    body.push_str(r#"<section class="sec" id="explore">
+      <p class="kicker">01 — Selected dossiers</p>
+      <h2>Explore the names</h2>
       <div class="grid">"#);
-    for branding in featured {
-        body.push_str(&card(branding, cache_dir, site));
-    }
-    body.push_str("</div><ul class=\"index\">");
-    for branding in rest {
-        body.push_str(&index_row(branding, site));
-    }
-    body.push_str("</ul></section>");
-
-    body.push_str(r#"<section class="sec" id="unnamed">
-      <p class="kicker">02 — Still a number</p>
-      <h2>No name on file.</h2>
-      <p class="intro">These exist in NVD and were not part of the famous set. Open one and the desk will coin it.</p>
-      <div class="tickets">"#);
-    for sample in samples {
-        body.push_str(&ticket(sample, site));
+    for item in cards {
+        match item {
+            ExploreCard::Filed(branding) => body.push_str(&card(branding, cache_dir, site)),
+            ExploreCard::Unfiled { id } => body.push_str(&unfiled_card(id, site)),
+        }
     }
     body.push_str("</div></section>");
     layout("BrandEveryVuln — a name for every CVE", &body, site, None)
-}
-
-pub struct SampleCard {
-    pub id: String,
-    pub note: String,
-    pub filed_name: Option<String>,
 }
 
 pub fn cve_page(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
@@ -256,35 +243,19 @@ fn colophon(branding: &Branding) -> String {
 
 fn card(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
     format!(
-        r#"<a class="card" href="{href}">{plate}<div><p class="id">{id}</p><h3>{name}</h3><p class="tag">{tag}</p></div></a>"#,
+        r#"<a class="card" href="{href}">{plate}<div class="card-meta"><p class="id">{id}</p><h3>{name}</h3></div></a>"#,
         href = esc(&site.cve_str(&branding.cve_id)),
         id = esc(&branding.cve_id),
         plate = plate(branding, cache_dir, false),
         name = esc(&branding.name),
-        tag = esc(&branding.tagline),
     )
 }
 
-fn index_row(branding: &Branding, site: &Site) -> String {
+fn unfiled_card(id: &str, site: &Site) -> String {
     format!(
-        r#"<li><a href="{href}"><span class="nm">{name}</span><span class="id">{id}</span></a></li>"#,
-        href = esc(&site.cve_str(&branding.cve_id)),
-        id = esc(&branding.cve_id),
-        name = esc(&branding.name),
-    )
-}
-
-fn ticket(sample: &SampleCard, site: &Site) -> String {
-    let eyebrow = match &sample.filed_name {
-        Some(name) => format!("Filed as {name}"),
-        None => "No name on file".into(),
-    };
-    format!(
-        r#"<a class="ticket" href="{href}"><span class="eyebrow">{eyebrow}</span><strong>{id}</strong><span class="note">{note}</span></a>"#,
-        href = esc(&site.cve_str(&sample.id)),
-        id = esc(&sample.id),
-        eyebrow = esc(&eyebrow),
-        note = esc(&sample.note),
+        r#"<a class="card card-unfiled" href="{href}"><div class="plate monogram" aria-hidden="true"><span>?</span></div><div class="card-meta"><p class="id">{id}</p><h3>Not named yet</h3><p class="card-sub">Click to generate</p></div></a>"#,
+        href = esc(&site.cve_str(id)),
+        id = esc(id),
     )
 }
 
@@ -324,6 +295,11 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
     let canonical = canonical
         .map(|url| format!(r#"<link rel="canonical" href="{}">"#, esc(url)))
         .unwrap_or_default();
+    let base_attr = site
+        .base_domain
+        .as_deref()
+        .map(|base| format!(r#" data-base-domain="{}""#, esc(base)))
+        .unwrap_or_default();
     format!(
         r#"<!DOCTYPE html>
 <html lang="en">
@@ -338,14 +314,14 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 {canonical}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
 </head>
-<body>
+<body{base_attr}>
 <div class="frame">
 <header class="top">
   <a class="word" href="{home}"><span class="seal" aria-hidden="true"></span>BrandEveryVuln</a>
   <nav>
-    <a href="{wall}">The wall</a>
-    <a href="{unnamed}">Unnamed</a>
+    <a href="{explore}">Explore</a>
     <a class="btn" href="{random}">Random CVE</a>
   </nav>
 </header>
@@ -358,9 +334,9 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 </body>
 </html>"#,
         title = esc(title),
+        base_attr = base_attr,
         home = esc(&site.home()),
-        wall = esc(&site.wall()),
-        unnamed = esc(&site.unnamed()),
+        explore = esc(&site.explore()),
         random = esc(&site.random()),
     )
 }
@@ -438,5 +414,31 @@ mod tests {
         assert!(html.contains("&quot;"));
         assert!(html.contains("Latchlight"));
         assert!(html.contains("7.5"));
+    }
+
+    #[test]
+    fn home_renders_explore_section_with_cards() {
+        let mut filed = sample("CVE-2014-0160", "Heartbleed");
+        filed.prefilled = true;
+        let cards = vec![
+            ExploreCard::Filed(filed),
+            ExploreCard::Unfiled { id: "CVE-2026-1337".into() },
+        ];
+        let site = crate::host::Site {
+            base_domain: Some("brandeveryvuln.com".into()),
+            scheme: "https".into(),
+            port: None,
+            request_host: "brandeveryvuln.com".into(),
+        };
+        let page = home(&cards, Path::new("/nope"), &site);
+        assert!(page.contains("Explore the names"));
+        assert!(page.contains("Every bug gets a <em>name</em>."));
+        assert!(page.contains("data-base-domain=\"brandeveryvuln.com\""));
+        assert!(page.contains(r#"<script src="/static/app.js" defer></script>"#));
+        assert!(page.contains("https://cve-2014-0160.brandeveryvuln.com/"));
+        assert!(page.contains("https://cve-2026-1337.brandeveryvuln.com/"));
+        assert!(page.contains("Not named yet"));
+        assert!(page.contains("Click to generate"));
+        assert!(!page.contains("Names that stuck"));
     }
 }
