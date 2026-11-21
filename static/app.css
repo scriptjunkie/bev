@@ -673,11 +673,6 @@ h1 em {
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto; }
-  .swap-word {
-    animation: none;
-    opacity: 0;
-  }
-  .swap-name { opacity: 1; }
 }
 
 .merch {
