@@ -40,7 +40,7 @@ pub fn home(cards: &[ExploreCard], cache_dir: &Path, site: &Site) -> String {
 }
 
 pub fn cve_page(branding: &Branding, cache_dir: &Path, site: &Site) -> String {
-    let title = format!("{} · {} · Bran Every Vuln", branding.name, branding.cve_id);
+    let title = format!("{} · {} · Brand Every Vuln", branding.name, branding.cve_id);
     let canonical = crate::cve::parse(&branding.cve_id)
         .ok()
         .and_then(|id| site.canonical_cve(&id));
