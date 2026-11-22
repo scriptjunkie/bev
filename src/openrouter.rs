@@ -64,7 +64,7 @@ impl OpenRouter {
                     eprintln!("name {id}: empty model response, using offline wordlist");
                     return Ok(offline_named(id, nvd));
                 }
-                Ok(interpret_naming(&text, &id.as_id(), &nvd.description, taken))
+                Ok(interpret_naming(&text, &id.as_id(), nvd, taken))
             }
             Err(err) => Err(err),
         }
@@ -139,13 +139,13 @@ fn format_score(score: f64) -> String {
 pub fn interpret_naming(
     raw: &str,
     cve_id: &str,
-    description: &str,
+    nvd: &NvdRecord,
     taken: impl Fn(&str) -> bool,
 ) -> Named {
     let cleaned = strip_fences(raw);
     if let Some(slice) = extract_json_object(&cleaned) {
         if let Ok(value) = serde_json::from_str::<Value>(slice) {
-            if let Some(named) = named_from_value(&value, cve_id, description, &taken) {
+            if let Some(named) = named_from_value(&value, cve_id, nvd, &taken) {
                 return named;
             }
         }
@@ -156,19 +156,19 @@ pub fn interpret_naming(
         .replace(['‘', '’'], "'");
     if let Some(slice) = extract_json_object(&softened) {
         if let Ok(value) = serde_json::from_str::<Value>(slice) {
-            if let Some(named) = named_from_value(&value, cve_id, description, &taken) {
+            if let Some(named) = named_from_value(&value, cve_id, nvd, &taken) {
                 return named;
             }
         }
     }
     eprintln!("name parse failed, using offline wordlist. raw={}", clip_chars(raw, 400));
-    offline_named_from(cve_id, description)
+    offline_named_from(cve_id, nvd)
 }
 
 fn named_from_value(
     value: &Value,
     cve_id: &str,
-    description: &str,
+    nvd: &NvdRecord,
     taken: &impl Fn(&str) -> bool,
 ) -> Option<Named> {
     let obj = value.as_object().or_else(|| {
@@ -179,11 +179,15 @@ fn named_from_value(
     })?;
     let name = field(obj, &["name", "title", "brand"])?;
     let name = clean_name(&name, cve_id, taken)?;
+    let name = crate::twoshell::maybe_append(&name, nvd, cve_id);
+    if taken(&name) {
+        return None;
+    }
     let tagline = field(obj, &["tagline", "slogan", "line"]).unwrap_or_default();
     let blurb = field(obj, &["blurb", "description", "summary"]).unwrap_or_default();
     let logo = field(obj, &["logo_prompt", "logo_concept", "prompt"]).unwrap_or_default();
-    let tagline = tidy_sentence(&tagline, 160).unwrap_or_else(|| fallback_tagline(description));
-    let blurb = tidy_sentence(&blurb, 420).unwrap_or_else(|| clip_chars(description, 280));
+    let tagline = tidy_sentence(&tagline, 160).unwrap_or_else(|| fallback_tagline(&nvd.description));
+    let blurb = tidy_sentence(&blurb, 420).unwrap_or_else(|| clip_chars(&nvd.description, 280));
     let logo_prompt = if logo.trim().is_empty() {
         default_logo_prompt(&name)
     } else {
@@ -267,15 +271,11 @@ fn valid_word(word: &str) -> bool {
 }
 
 fn offline_named(id: &CveId, nvd: &NvdRecord) -> Named {
-    offline_named_from(&id.as_id(), &nvd.description)
+    offline_named_from(&id.as_id(), nvd)
 }
 
-fn offline_named_from(cve_id: &str, description: &str) -> Named {
-    let record = NvdRecord {
-        description: description.to_string(),
-        ..NvdRecord::default()
-    };
-    let coined = crate::offline::coin(&record, cve_id);
+fn offline_named_from(cve_id: &str, nvd: &NvdRecord) -> Named {
+    let coined = crate::offline::coin(nvd, cve_id);
     Named {
         logo_prompt: default_logo_prompt(&coined.name),
         tagline: coined.tagline,
@@ -553,10 +553,18 @@ use std::io::Read;
 mod tests {
     use super::*;
 
+    fn rec(description: &str) -> NvdRecord {
+        NvdRecord {
+            description: description.into(),
+            ..NvdRecord::default()
+        }
+    }
+
     #[test]
     fn parses_fenced_json_and_rejects_a_stolen_name() {
         let raw = "```json\n{\"name\":\"Heartbleed\",\"tagline\":\"nope\",\"blurb\":\"nope\",\"logo_prompt\":\"a heart\"}\n```";
-        let named = interpret_naming(raw, "CVE-2026-0001", "A use after free.", |n| {
+        let nvd = rec("A use after free.");
+        let named = interpret_naming(raw, "CVE-2026-0001", &nvd, |n| {
             n.eq_ignore_ascii_case("heartbleed")
         });
         assert_eq!(named.source, "offline");
@@ -567,7 +575,7 @@ mod tests {
     #[test]
     fn parses_a_clean_object() {
         let raw = r#"{"name":"Latchlight","tagline":"The driver keeps a pointer it already freed.","blurb":"A local process can still use GPU memory the kernel released. The window is small and the impact is not.","logo_prompt":"A circle broken by a wedge, cream on ink."}"#;
-        let named = interpret_naming(raw, "CVE-2026-0001", "unused", |_| false);
+        let named = interpret_naming(raw, "CVE-2026-0001", &rec("unused"), |_| false);
         assert_eq!(named.source, "model");
         assert_eq!(named.name, "Latchlight");
         assert!(named.tagline.contains("pointer"));
@@ -576,7 +584,33 @@ mod tests {
     #[test]
     fn extracts_object_from_prose() {
         let raw = "Sure!\n{\"name\":\"Paper Harbor\",\"tagline\":\"A short line about the parser.\",\"blurb\":\"One. Two.\",\"logo_prompt\":\"a folded sheet\"}\nThanks";
-        let named = interpret_naming(raw, "CVE-2020-0001", "desc", |_| false);
+        let named = interpret_naming(raw, "CVE-2020-0001", &rec("desc"), |_| false);
+        assert_eq!(named.name, "Paper Harbor");
+    }
+
+    #[test]
+    fn appends_2shell_to_a_model_name_when_the_description_qualifies() {
+        let raw = r#"{"name":"CaseSlip","tagline":"A short line about the decoder.","blurb":"One. Two.","logo_prompt":"a mark"}"#;
+        let named = interpret_naming(raw, "CVE-2026-9001", &rec("A buffer overflow in the decoder."), |_| false);
+        assert_eq!(named.source, "model");
+        assert_eq!(named.name, "CaseSlip2Shell");
+    }
+
+    #[test]
+    fn uniqueness_is_checked_after_2shell_is_appended() {
+        let raw = r#"{"name":"CaseSlip","tagline":"A short line about the decoder.","blurb":"One. Two.","logo_prompt":"a mark"}"#;
+        let named = interpret_naming(raw, "CVE-2026-9001", &rec("A use after free in the driver."), |n| {
+            n == "CaseSlip2Shell"
+        });
+        assert_ne!(named.name, "CaseSlip2Shell");
+        assert_eq!(named.source, "offline");
+        assert!(named.name.ends_with("2Shell"), "{}", named.name);
+    }
+
+    #[test]
+    fn leaves_non_qualifying_model_names_alone() {
+        let raw = r#"{"name":"Paper Harbor","tagline":"A short line about the parser.","blurb":"One. Two.","logo_prompt":"a folded sheet"}"#;
+        let named = interpret_naming(raw, "CVE-2020-0001", &rec("Cross-site scripting in the admin UI."), |_| false);
         assert_eq!(named.name, "Paper Harbor");
     }
 }

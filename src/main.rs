@@ -11,6 +11,7 @@ mod offline;
 mod openrouter;
 mod paths;
 mod print;
+mod twoshell;
 
 use std::fs;
 use std::io::Cursor;

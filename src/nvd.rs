@@ -260,7 +260,31 @@ pub fn parse_body(body: &str, id: &CveId) -> Result<NvdRecord, NvdError> {
         affected,
         cvss: pick_cvss(cve.get("metrics")),
         nvd_url: format!("https://nvd.nist.gov/vuln/detail/{id}"),
+        cwes: parse_cwes(&cve),
     })
+}
+
+fn parse_cwes(cve: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(list) = cve.get("weaknesses").and_then(|v| v.as_array()) else {
+        return out;
+    };
+    for weakness in list {
+        let Some(descs) = weakness.get("description").and_then(|v| v.as_array()) else {
+            continue;
+        };
+        for desc in descs {
+            let Some(raw) = desc.get("value").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            if let Some(id) = crate::twoshell::normalize_cwe(raw) {
+                if !out.contains(&id) {
+                    out.push(id);
+                }
+            }
+        }
+    }
+    out
 }
 
 fn english_description(cve: &Value) -> Option<String> {
@@ -588,6 +612,30 @@ mod tests {
         assert_eq!(cvss.version, "4.0");
         assert_eq!(cvss.score, 8.9);
         assert_eq!(cvss.severity, "HIGH");
+    }
+
+
+    #[test]
+    fn reads_cwe_ids_from_weaknesses() {
+        let body = r#"{
+            "totalResults": 1,
+            "vulnerabilities": [{
+                "cve": {
+                    "descriptions": [{"lang": "en", "value": "A parser bug."}],
+                    "weaknesses": [
+                        {"source": "nvd@nist.gov", "type": "Primary", "description": [
+                            {"lang": "en", "value": "CWE-787"}
+                        ]},
+                        {"source": "other", "type": "Secondary", "description": [
+                            {"lang": "en", "value": "cwe-416"},
+                            {"lang": "en", "value": "CWE-787"}
+                        ]}
+                    ]
+                }
+            }]
+        }"#;
+        let rec = parse_body(body, &id()).unwrap();
+        assert_eq!(rec.cwes, vec!["CWE-787".to_string(), "CWE-416".to_string()]);
     }
 
     #[test]

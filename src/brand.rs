@@ -167,6 +167,16 @@ impl App {
                 offline_named(id, &nvd)
             }
         };
+        let named = {
+            let mut named = named;
+            named.name = crate::twoshell::maybe_append(&named.name, &nvd, &id.as_id());
+            if famous::name_taken(&named.name, &id.as_id()) {
+                eprintln!("name {id} {} was taken, using offline wordlist", named.name);
+                offline_named(id, &nvd)
+            } else {
+                named
+            }
+        };
         eprintln!("name {id} -> {} ({})", named.name, named.source);
         let (image, logo_source) = match self.openrouter_key.as_deref() {
             Some(key) => {

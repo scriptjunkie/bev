@@ -32,6 +32,11 @@ pub const EXPLORE_IDS: &[&str] = &[
     "CVE-2026-101887",
 ];
 
+pub fn is_canon(cve_id: &str) -> bool {
+    let id = cve_id.trim().to_ascii_uppercase();
+    CANON.iter().any(|c| c.id == id)
+}
+
 pub fn name_taken(name: &str, cve_id: &str) -> bool {
     let folded = fold(name);
     if folded.is_empty() {
@@ -61,5 +66,12 @@ mod tests {
         assert!(name_taken("DirtyCow", "CVE-2026-0001"));
         assert!(!name_taken("Heartbleed", "CVE-2014-0160"));
         assert!(!name_taken("Latchlight", "CVE-2026-0001"));
+    }
+
+    #[test]
+    fn canon_ids_are_recognized() {
+        assert!(is_canon("cve-2014-0160"));
+        assert!(is_canon("CVE-2014-6271"));
+        assert!(!is_canon("CVE-2026-0001"));
     }
 }

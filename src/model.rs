@@ -53,6 +53,9 @@ pub struct NvdRecord {
     pub cvss: Option<Cvss>,
     #[serde(default)]
     pub nvd_url: String,
+    /// CWE identifiers from the NVD weaknesses list, e.g. "CWE-787".
+    #[serde(default)]
+    pub cwes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -149,6 +152,7 @@ pub fn sample(id: &str, name: &str) -> Branding {
                 vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N".into(),
             }),
             nvd_url: format!("https://nvd.nist.gov/vuln/detail/{id}"),
+            cwes: vec![],
         },
     }
 }

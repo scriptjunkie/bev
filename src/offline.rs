@@ -26,14 +26,15 @@ pub fn coin_from(nvd: &NvdRecord, cve_id: &str, rng: &mut impl FnMut() -> u64) -
     let keywords = keywords(nvd);
     let mut name = String::new();
     for _ in 0..12 {
-        let candidate = compose(&keywords, rng);
+        let candidate = crate::twoshell::maybe_append(&compose(&keywords, rng), nvd, cve_id);
         if !famous::name_taken(&candidate, cve_id) {
             name = candidate;
             break;
         }
     }
     if name.is_empty() {
-        name = format!("Relic{}", SUFFIXES[(rng() as usize) % SUFFIXES.len()]);
+        let fallback = format!("Relic{}", SUFFIXES[(rng() as usize) % SUFFIXES.len()]);
+        name = crate::twoshell::maybe_append(&fallback, nvd, cve_id);
     }
     let tagline = first_sentence(&nvd.description);
     let blurb = if nvd.description.trim().is_empty() {
@@ -351,5 +352,30 @@ mod tests {
         let low_svg = svg("QuietStorm", &low);
         assert!(low_svg.contains("#3f9d72"));
         assert!(!low_svg.contains("#e23b2b"));
+    }
+
+    #[test]
+    fn qualifying_cves_use_2shell_instead_of_another_suffix() {
+        let nvd = NvdRecord {
+            product: Some("pickle".into()),
+            description: "A buffer overflow in the parser.".into(),
+            ..NvdRecord::default()
+        };
+        // seq 0,0,2 would normally compose PickleBleed (suffix index 2).
+        let named = coin_from(&nvd, "CVE-2026-13313", &mut seq(&[0, 0, 2]));
+        assert_eq!(named.name, "Pickle2Shell");
+        assert!(named.name.chars().all(|c| c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn uniqueness_is_checked_on_the_final_2shell_name() {
+        let nvd = NvdRecord {
+            product: Some("pickle".into()),
+            description: "A use after free in the driver.".into(),
+            ..NvdRecord::default()
+        };
+        let named = coin_from(&nvd, "CVE-2026-13313", &mut seq(&[0, 0, 0]));
+        assert_eq!(named.name, "Pickle2Shell");
+        assert!(!famous::name_taken(&named.name, "CVE-2026-13313"));
     }
 }
