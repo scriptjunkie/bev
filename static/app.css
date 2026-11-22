@@ -750,6 +750,10 @@ body.is-busy a.is-busy-link {
   cursor: wait;
 }
 
+body.is-busy {
+  padding-top: 3.25rem;
+}
+
 a.is-busy-link {
   pointer-events: none;
   opacity: 0.8;

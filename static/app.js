@@ -107,7 +107,7 @@
       link.classList.add("is-busy-link");
       link.setAttribute("aria-disabled", "true");
       if (shirt) setButtonBusy(link, "Making your shirt…");
-      else if (random) setButtonBusy(link, "Coining…");
+      else if (random && link.classList.contains("btn")) setButtonBusy(link, "Coining…");
     }
 
     return true;
