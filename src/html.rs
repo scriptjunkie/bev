@@ -353,6 +353,21 @@ fn search_form(site: &Site) -> String {
     )
 }
 
+fn asset_query(rel: &str) -> String {
+    let path = crate::paths::project_root().join(rel);
+    let data = std::fs::read(path).unwrap_or_default();
+    format!("?v={}", fnv1a64_hex(&data))
+}
+
+fn fnv1a64_hex(data: &[u8]) -> String {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in data {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
+}
+
 fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> String {
     let canonical = canonical
         .map(|url| format!(r#"<link rel="canonical" href="{}">"#, esc(url)))
@@ -362,6 +377,8 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
         .as_deref()
         .map(|base| format!(r#" data-base-domain="{}""#, esc(base)))
         .unwrap_or_default();
+    let css_v = asset_query("static/app.css");
+    let js_v = asset_query("static/app.js");
     format!(
         r#"<!DOCTYPE html>
 <html lang="en">
@@ -375,8 +392,8 @@ fn layout(title: &str, body: &str, site: &Site, canonical: Option<&str>) -> Stri
 <meta property="og:description" content="Brand Every Vuln gives every CVE a name, logo, and website.">
 {canonical}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/app.js" defer></script>
+<link rel="stylesheet" href="/static/app.css{css_v}">
+<script src="/static/app.js{js_v}" defer></script>
 </head>
 <body{base_attr}>
 <div class="frame">
@@ -501,7 +518,9 @@ mod tests {
         assert!(page.contains(r#"<span class="swap-word swap-tshirt"><em>T-shirt</em>.</span>"#));
         assert!(page.contains(r#"aria-hidden="true""#));
         assert!(page.contains("data-base-domain=\"brandeveryvuln.com\""));
-        assert!(page.contains(r#"<script src="/static/app.js" defer></script>"#));
+        assert!(page.contains(r#"<link rel="stylesheet" href="/static/app.css?v="#));
+        assert!(page.contains(r#"<script src="/static/app.js?v="#));
+        assert!(page.contains(r#"" defer></script>"#));
         assert!(page.contains("https://cve-2014-0160.brandeveryvuln.com/"));
         assert!(page.contains("https://cve-2026-1337.brandeveryvuln.com/"));
         assert!(page.contains("Not named yet"));
@@ -617,6 +636,15 @@ mod tests {
         let sanitized = cve_page(&branding, Path::new("/nope"), &test_site(), None);
         assert!(sanitized.contains("Name and mark generated for this CVE. Not an official vendor mark."));
         assert_no_model_ids(&sanitized);
+    }
+
+    #[test]
+    fn stylesheets_are_cache_busted() {
+        let q = asset_query("static/app.css");
+        assert!(q.starts_with("?v="), "{q}");
+        assert_eq!(q.len(), 19);
+        assert_eq!(asset_query("static/app.css"), q);
+        assert_ne!(asset_query("static/app.js"), q);
     }
 
     #[test]
